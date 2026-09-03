@@ -62,6 +62,84 @@
         </div>
 
         <div class="card">
+          <h2 data-i18n="cat_title">Categorie di siti</h2>
+          <p class="hint" data-i18n="cat_hint">Blocchi e limiti pronti per gruppi di siti. Il limite giornaliero di una categoria è condiviso tra tutti i suoi domini (budget unico).</p>
+          <div id="catRows"></div>
+          <div id="incogBanner" class="warn-banner" hidden>
+            <span data-i18n="incog_msg"></span>
+            <button type="button" id="incogOpen" data-i18n="incog_open"></button>
+          </div>
+        </div>
+
+        <div class="card" id="proCard">
+          <div class="pro-head">
+            <h2 data-i18n="pro_title">Funzioni PRO</h2>
+            <span class="pro-badge">PRO</span>
+          </div>
+          <p class="pro-tagline" data-i18n="pro_tagline">Potenzia il Focus: blocchi ferrei, fasce orarie, temi esclusivi e categorie su misura — con un acquisto una tantum.</p>
+          <div id="proLocked">
+            <ul class="pro-features">
+              <li>
+                <span class="pf-ico">⛓</span>
+                <span><span class="pf-name" data-i18n="ct_title">Blocco ferreo</span><br><span class="pf-desc" data-i18n="pro_feat_ct_d">Siti o categorie bloccati per ore/giorni, senza possibilità di override.</span></span>
+              </li>
+              <li>
+                <span class="pf-ico">🕒</span>
+                <span><span class="pf-name" data-i18n="sched_title">Fasce orarie</span><br><span class="pf-desc" data-i18n="pro_feat_sched_d">I blocchi si attivano solo nelle finestre settimanali che scegli.</span></span>
+              </li>
+              <li>
+                <span class="pf-ico">🎨</span>
+                <span><span class="pf-name" data-i18n="pro_feat_themes">Temi PRO in gradiente</span><br><span class="pf-desc" data-i18n="pro_feat_themes_d">Sfondi esclusivi a due colori, con anteprima gratuita.</span></span>
+              </li>
+              <li>
+                <span class="pf-ico">✏️</span>
+                <span><span class="pf-name" data-i18n="pro_feat_catedit">Categorie personalizzate</span><br><span class="pf-desc" data-i18n="pro_feat_catedit_d">Modifica i siti inclusi in ogni categoria.</span></span>
+              </li>
+            </ul>
+            <div class="pro-pay-row" id="proPayRow">
+              <button type="button" id="proUnlock" class="btn-pro" data-i18n="pro_unlock">Sblocca PRO (Lifetime)</button>
+              <button type="button" id="proLogin" class="btn-ghost-pro" data-i18n="pro_login">Ho già pagato? Accedi</button>
+            </div>
+            <p class="hint" id="proMsg"></p>
+          </div>
+          <div id="proTools" hidden>
+            <p class="hint" id="proThanks" hidden data-i18n="pro_thanks">Grazie! Le funzioni PRO sono ora attive 🎉</p>
+            <div class="pro-block">
+              <h3 data-i18n="ct_title">Blocco ferreo</h3>
+              <p class="hint" data-i18n="ct_hint">Blocco totale e irreversibile del target scelto per le ore/giorni indicati: non si può disattivare né aggirare (nemmeno col PIN) finché non scade.</p>
+              <div class="pro-row">
+                <select id="ctTarget" aria-label="Target"></select>
+                <input type="number" id="ctHours" min="0" max="720" step="1" value="1" aria-label="Hours">
+                <span data-i18n="ct_hours">ore</span>
+                <input type="number" id="ctDays" min="0" max="60" step="1" value="0" aria-label="Days">
+                <span data-i18n="ct_days">giorni</span>
+                <button type="button" id="ctStart" class="danger-btn" data-i18n="ct_start">Attiva blocco</button>
+              </div>
+              <h3 data-i18n="ct_active_title">Blocchi ferrei attivi</h3>
+              <div id="ctActive" class="pro-list"></div>
+              <p class="hint" id="ctMsg"></p>
+            </div>
+            <div class="pro-block">
+              <h3 data-i18n="sched_title">Fasce orarie</h3>
+              <p class="hint" data-i18n="sched_hint">Il blocco del sito o della categoria è attivo solo nelle fasce scelte (es. lun–ven 09:00–18:00). Fuori fascia nessun blocco.</p>
+              <div class="pro-row">
+                <select id="schedTarget" aria-label="Target"></select>
+              </div>
+              <div class="pro-row" id="schedDays"></div>
+              <div class="pro-row">
+                <span data-i18n="sched_from">dalle</span>
+                <input type="time" id="schedStart" value="09:00">
+                <span data-i18n="sched_to">alle</span>
+                <input type="time" id="schedEnd" value="18:00">
+                <button type="button" id="schedSave" class="primary" data-i18n="save">Salva</button>
+              </div>
+              <div id="schedList" class="pro-list"></div>
+              <p class="hint" id="schedMsg"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <h2 data-i18n="grace_period">Periodo di grazia</h2>
           <p class="hint" data-i18n="grace_hint">Dopo aver tenuto premuto, il sito resta aperto per N minuti senza nuovi blocchi, anche cambiando pagina nella stessa scheda.</p>
           <div class="inline-field">
@@ -102,6 +180,22 @@
         <div class="card">
           <h2 data-i18n="theme">Tema</h2>
           <div id="themeGrid"></div>
+
+          <div class="pro-theme-head">
+            <span class="crown">👑</span>
+            <span data-i18n="pro_theme_section">Temi PRO</span>
+            <span class="pro-badge">PRO</span>
+          </div>
+          <p class="pro-theme-hint" data-i18n="pro_theme_hint">Sfondi in gradiente esclusivi. Sei PRO? Clicca per applicare. Altrimenti puoi provarli in anteprima gratuita.</p>
+          <div id="proThemeGrid"></div>
+          <div id="proPreviewBar" hidden>
+            <span data-i18n="pro_preview_label">🎨 Anteprima del tema PRO:</span>
+            <span class="pp-name" id="proPreviewName"></span>
+            <span style="flex:1"></span>
+            <button type="button" id="proPreviewUnlock" class="btn-pro" data-i18n="pro_unlock">Sblocca PRO (Lifetime)</button>
+            <button type="button" id="proPreviewClose" class="btn-ghost-pro" data-i18n="pro_preview_close">Chiudi anteprima</button>
+          </div>
+
           <div id="customEditor" hidden>
             <div class="inline-field" style="margin-top:18px">
               <label for="ctName" data-i18n="theme_name">Nome</label>
@@ -177,6 +271,20 @@
             <span data-i18n="show_search">Mostra la barra di ricerca web sulla nuova scheda</span>
           </label>
         </div>
+
+        <div class="card">
+          <h2 data-i18n="advanced_title">Avanzate</h2>
+          <div class="inline-field">
+            <label for="bgImage" data-i18n="bg_image">Immagine di sfondo (URL)</label>
+            <input type="text" id="bgImage" placeholder="https://…" data-i18n-ph="bg_image_ph" autocomplete="off" spellcheck="false" aria-label="Immagine di sfondo (URL)" data-i18n-aria="bg_image">
+          </div>
+          <div class="inline-field">
+            <label for="borderRadius" data-i18n="border_radius">Arrotondamento bordi</label>
+            <input type="range" id="borderRadius" min="0" max="24" step="1" aria-label="Arrotondamento bordi" data-i18n-aria="border_radius">
+            <span id="borderRadiusVal">8px</span>
+            <button type="button" id="borderRadiusReset" data-i18n="reset_advanced" aria-label="Reset" data-i18n-aria="reset_advanced">Reset</button>
+          </div>
+        </div>
       </section>
 
       <!-- ================= SICUREZZA ================= -->
@@ -199,6 +307,13 @@
       <!-- ================= INFO ================= -->
       <section id="sec-info" hidden>
         <div class="card">
+          <h2 data-i18n="pro_dev_title">PRO — solo sviluppo</h2>
+          <label class="check-row">
+            <input type="checkbox" id="proTestToggle">
+            <span data-i18n="pro_dev_label">Abilita le funzioni PRO per i test (da rimuovere prima della pubblicazione: in produzione la verifica passa da ExtensionPay).</span>
+          </label>
+        </div>
+        <div class="card">
           <h2>Minimalista</h2>
           <p data-i18n-html="info_about_1">
             Estensione Chrome ispirata all'app Android <strong>Minimalista</strong> (launcher
@@ -209,8 +324,9 @@
           </p>
           <p style="margin-top:12px" data-i18n-html="info_about_2">
             Tutti i dati (impostazioni, ToDo, statistiche) restano <strong>solo sul tuo
-            dispositivo</strong>, in <code>chrome.storage.local</code>. Nessun dato viene inviato
-            da nessuna parte.
+            dispositivo</strong>, in <code>chrome.storage.local</code>. Nessun contenuto personale
+            viene inviato: l'unica comunicazione esterna è la verifica dello stato PRO
+            (pagamento) tramite ExtensionPay.
           </p>
           <p style="margin-top:12px" data-i18n="info_version">Versione 1.0.0 · Sviluppatore: Daniele Terracciano</p>
         </div>
@@ -221,6 +337,7 @@
 
   <script src="common.js"></script>
   <script src="i18n.js"></script>
+  <script src="ExtPay.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

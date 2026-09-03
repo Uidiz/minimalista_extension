@@ -9,13 +9,58 @@
 //  - gestisce il "periodo di grazia" dopo uno sblocco.
 "use strict";
 
-importScripts("common.js", "i18n.js");
+importScripts("common.js", "i18n.js", "ExtPay.js");
 
 let settings = null;   // cache in memoria delle impostazioni
 let stats = null;      // cache in memoria delle statistiche
 let tracker = null;    // { tabId, domain, since } — tab attualmente monitorato
 let grace = {};        // tabId → timestamp di scadenza del periodo di grazia (storage.session)
 let listenersReady = false;
+
+/* ============================================================
+   ExtensionPay (pagamenti PRO — sezione 7 del TODO)
+   ------------------------------------------------------------
+   Il flag locale (_aT) serve solo all'interfaccia; le azioni critiche
+   passano SEMPRE da verifyProLive(), che interroga il server di
+   ExtensionPay (extpay.getUser). extpay.startBackground() deve essere
+   chiamato una sola volta per esecuzione del worker: abilita la
+   comunicazione tra le pagine dell'estensione (options) ed ExtPay.
+   ============================================================ */
+let extpay = null; // istanza lazy: creata solo se EXT_PAY_ID è configurato
+function ensureExtPay() {
+  if (!extpay && extpayConfigured()) extpay = ExtPay(EXT_PAY_ID);
+  return extpay;
+}
+if (extpayConfigured()) {
+  try { ensureExtPay().startBackground(); } catch { /* ExtPay assente o non registrato */ }
+}
+
+// Dev toggle (Info → "PRO — solo sviluppo"): da rimuovere prima della pubblicazione.
+async function devProOn() {
+  try { const d = await chrome.storage.local.get("_devPro"); return d._devPro === true; }
+  catch { return false; }
+}
+
+// Imposta/rimuove la firma UI (_aT) in settings, persistendo solo se cambia.
+async function setProSig(on) {
+  if (!settings || (settings[_PRO_SIG] === _PRO_OK) === !!on) return;
+  settings[_PRO_SIG] = on ? _PRO_OK : null;
+  await storageSet("settings", settings);
+}
+
+// Interroga ExtensionPay e allinea la firma UI. Usata all'avvio/installazione
+// e alla richiesta esplicita delle pagine ("proRefresh", es. dopo il pagamento).
+async function refreshProStatus() {
+  if (!extpayConfigured()) return false;
+  try {
+    const user = await ensureExtPay().getUser();
+    const paid = !!(user && user.paid);
+    await setProSig(paid || (await devProOn()));
+    return paid;
+  } catch {
+    return false; // errore di rete/account: non si tocca l'ultimo stato noto
+  }
+}
 
 /* ============================================================
    Inizializzazione
@@ -32,19 +77,49 @@ async function init() {
   await chrome.alarms.create("minimalista-tick", { periodInMinutes: 0.5 });
   await resumeTracking(); // riparte subito a contare la scheda attiva, senza aspettare un evento
   enforceLimits();        // e blocca subito eventuali siti già oltre il limite
+  refreshProStatus();     // allinea la firma UI allo stato reale su ExtensionPay
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
   const s = await storageGet("settings");
   if (!s) await storageSet("settings", JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
   await chrome.alarms.create("minimalista-tick", { periodInMinutes: 0.5 });
+  refreshProStatus(); // utente già pagato su extensionpay.com → sblocca subito la UI
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  refreshProStatus(); // riallinea la firma UI a ogni avvio del browser
 });
 
 init();
 
 /* ============================================================
-   Intercettazione delle navigazioni
+   Regole di blocco (siti singoli + categorie precompilate)
+   ------------------------------------------------------------
+   Per ogni dominio si applica al più una regola: se il sito è configurato
+   singolarmente (settings.sites) la sua configurazione ha la precedenza su
+   un'eventuale categoria di cui il dominio fa parte; altrimenti si usa la
+   configurazione della categoria attiva che lo contiene. Il dominio può essere
+   sia in un sito singolo sia in una categoria (es. instagram.com è un default
+   ed è anche in "Social"): in quel caso il singolo sito governa l'intercettazione
+   e il budget aggregato della categoria continua a conteggiarlo nelle statistiche.
    ============================================================ */
+function resolveHit(url) {
+  const host = bareDomain(hostOf(url));
+  if (!host) return null;
+  const now = Date.now();
+  const site = siteFor(url, settings.sites);
+  if (site) {
+    if (site.active || (site.ctUntil || 0) > now) return { site, domain: site.domain };
+    // sito singolo presente ma inattivo (senza cold turkey): si ricade sulla categoria
+  }
+  const hc = hostCategory(host, settings);
+  if (!hc) return null;
+  const conf = categoryConf(settings, hc.cat.id);
+  if (conf.active || (conf.ctUntil || 0) > now) return { conf, reg: hc.cat, domain: hc.domain };
+  return null;
+}
+
 function ensureListeners() {
   if (listenersReady) return;
   listenersReady = true;
@@ -53,24 +128,38 @@ function ensureListeners() {
     if (details.frameId !== 0) return;                  // solo il frame principale
     const url = details.url;
     if (!/^https?:\/\//i.test(url)) return;             // ignora chrome://, about:, estensione, ecc.
+    const now = Date.now();
+    const hit = resolveHit(url);
+    if (!hit) return;
+
+    // 0) cold turkey (PRO): blocco totale e irreversibile, vince su tutto
+    //    (anche su Focus spento e sul periodo di grazia)
+    const ctUntil = hit.site ? (hit.site.ctUntil || 0) : (hit.conf.ctUntil || 0);
+    if (ctUntil > now) return intercept(details.tabId, url, "ct");
+
     if (!settings.focusEnabled) return;                 // Focus spento → nessun blocco
-    const site = siteFor(url, settings.sites);
-    if (!site || !site.active) return;
 
-    const today = dayKey();
-    const used = (stats.byDay[today] && stats.byDay[today][site.domain]) || 0;
+    // 1) fascia oraria (PRO): il blocco è attivo solo nelle finestre configurate
+    const sched = hit.site ? hit.site.schedule : (hit.conf.schedule || null);
+    if (sched && !scheduleActive(sched)) return;
 
-    // 1) limite giornaliero: vince su tutto
-    if (site.limitMinutes > 0 && used >= site.limitMinutes * 60) {
-      return intercept(details.tabId, url, "limit");
+    // 2) limite giornaliero: singolo sito oppure budget aggregato di categoria
+    const limit = hit.site ? hit.site.limitMinutes : (hit.conf.limitMinutes || 0);
+    if (limit > 0) {
+      const used = hit.site
+        ? ((stats.byDay[dayKey()] || {})[hit.site.domain] || 0)
+        : categoryUsedSeconds(hit.conf.id, stats, null, settings);
+      if (used >= limit * 60) {
+        return intercept(details.tabId, url, "limit", hit.site ? null : hit.conf.id);
+      }
     }
-    // 2) periodo di grazia: dopo uno sblocco il tab naviga libero per un po'
-    if (grace[details.tabId] && grace[details.tabId] > Date.now()) return;
-    // 3) modalità "blocco totale" → niente sblocco
-    if (site.mode === "block") {
-      return intercept(details.tabId, url, "block");
-    }
-    // 4) default: tieni premuto per continuare
+
+    // 3) periodo di grazia: dopo uno sblocco il tab naviga libero per un po'
+    if (grace[details.tabId] && grace[details.tabId] > now) return;
+    // 4) modalità "blocco totale" → niente sblocco
+    const mode = hit.site ? hit.site.mode : (hit.conf.mode || "hold");
+    if (mode === "block") return intercept(details.tabId, url, "block");
+    // 5) default: tieni premuto per continuare
     return intercept(details.tabId, url, "hold");
   }, { url: [{ schemes: ["http", "https"] }] });
 
@@ -152,6 +241,89 @@ function ensureListeners() {
           break;
         }
 
+        case "proTest": {
+          // Toggle di sviluppo: marca l'interfaccia come PRO (solo segnale UI).
+          settings[_PRO_SIG] = msg.on ? _PRO_OK : null;
+          await storageSet("settings", settings);
+          sendResponse({ ok: true });
+          break;
+        }
+
+        case "proRefresh": {
+          // Richiesta delle pagine (es. dopo il ritorno dalla pagina di pagamento
+          // ExtensionPay): interroga il server e allinea la firma UI.
+          const paid = await refreshProStatus();
+          sendResponse({ ok: true, paid: !!paid });
+          break;
+        }
+
+        case "coldTurkey": {
+          // Blocco ferreo su un singolo sito o su una categoria (PRO).
+          // Verifica "live" prima di attivare: il flag locale da solo non basta.
+          // verifyProLive() rimuove da sola la firma UI se il pagamento non risulta.
+          if (!(await verifyProLive())) {
+            sendResponse({ ok: false, reason: "pro" });
+            break;
+          }
+          const hours = Math.max(0, Math.round(Number(msg.hours) || 0));
+          const days = Math.max(0, Math.round(Number(msg.days) || 0));
+          const ms = hours * 3600000 + days * 86400000;
+          if (ms < 60000) { sendResponse({ ok: false, reason: "invalid" }); break; }
+          const until = Date.now() + ms;
+          let found = false;
+          if (msg.kind === "site") {
+            const site = settings.sites.find(s => String(s.id) === String(msg.id));
+            if (site) { site.ctUntil = until; found = true; }
+          } else if (msg.kind === "cat") {
+            const conf = settings.categories.find(c => c.id === msg.id);
+            if (conf) { conf.ctUntil = until; found = true; }
+          }
+          if (!found) { sendResponse({ ok: false, reason: "invalid" }); break; }
+          settings = sanitizeSettings(settings);
+          await storageSet("settings", settings);
+          sendResponse({ ok: true, ctUntil: until });
+          break;
+        }
+
+        case "proSchedule": {
+          // Fasce orarie settimanali su sito/categoria (PRO): anche qui verifica live.
+          if (!(await verifyProLive())) {
+            sendResponse({ ok: false, reason: "pro" });
+            break;
+          }
+          let found = false;
+          if (msg.kind === "site") {
+            const site = settings.sites.find(s => String(s.id) === String(msg.id));
+            if (site) { site.schedule = sanitizeSchedule(msg.schedule); found = true; }
+          } else if (msg.kind === "cat") {
+            const conf = settings.categories.find(c => c.id === msg.id);
+            if (conf) { conf.schedule = sanitizeSchedule(msg.schedule); found = true; }
+          }
+          if (!found) { sendResponse({ ok: false, reason: "invalid" }); break; }
+          settings = sanitizeSettings(settings);
+          await storageSet("settings", settings);
+          sendResponse({ ok: true });
+          break;
+        }
+
+        case "proSaveCategories": {
+          // Lista personalizzata dei domini di una categoria (PRO). La verifica
+          // live impedisce di sbloccare la modifica falsificando lo storage.
+          if (!(await verifyProLive())) {
+            sendResponse({ ok: false, reason: "pro" });
+            break;
+          }
+          const conf = settings.categories.find(c => c.id === msg.id);
+          if (!conf) { sendResponse({ ok: false, reason: "invalid" }); break; }
+          conf.domains = Array.isArray(msg.domains)
+            ? [...new Set(msg.domains.map(normalizeDomain).filter(Boolean))]
+            : [];
+          settings = sanitizeSettings(settings);
+          await storageSet("settings", settings);
+          sendResponse({ ok: true, domains: conf.domains });
+          break;
+        }
+
         case "unlock": {
           // Lo sblocco arriva dalla pagina di blocco dopo il "tieni premuto".
           const tabId = msg.tabId;
@@ -182,10 +354,12 @@ function ensureListeners() {
 /* ============================================================
    Blocco
    ============================================================ */
-async function intercept(tabId, url, reason) {
+async function intercept(tabId, url, reason, categoryId) {
   bumpCounter("blocked");
-  const blockUrl = chrome.runtime.getURL("block.html") +
+  let blockUrl = chrome.runtime.getURL("block.html") +
     "?u=" + encodeURIComponent(url) + "&r=" + reason;
+  // per il limite di una categoria la pagina di blocco mostra il totale del budget
+  if (categoryId) blockUrl += "&c=" + encodeURIComponent(categoryId);
   try {
     await chrome.tabs.update(tabId, { url: blockUrl });
   } catch { /* il tab può essere già sparito: nessun problema */ }
@@ -200,8 +374,12 @@ async function intercept(tabId, url, reason) {
 // stessa, file://…) non vengono mai conteggiate.
 function domainForUrl(url) {
   if (!/^https?:\/\//i.test(url || "")) return null;
+  const host = bareDomain(hostOf(url));
+  if (!host) return null;
   const site = siteFor(url, settings.sites);
-  return (site && site.domain) || bareDomain(hostOf(url)) || null;
+  if (site) return site.domain;                 // dominio canonico del sito configurato
+  const hc = hostCategory(host, settings);      // dominio canonico della categoria
+  return (hc && hc.domain) || host;
 }
 
 async function domainOfTab(tabId) {
@@ -238,19 +416,44 @@ async function resumeTracking() {
   } catch { /* finestra chiusa nel frattempo: nessun problema */ }
 }
 
-// Se un sito configurato ha superato il limite giornaliero, blocca subito le
-// schede ancora aperte su quel sito (anche senza una nuova navigazione).
+// Se un sito (o una categoria) ha superato il limite giornaliero o è in cold
+// turkey, blocca subito le schede ancora aperte sul dominio (anche senza una
+// nuova navigazione). Il cold turkey vale anche con Focus spento.
 async function enforceLimits() {
-  if (!settings || !settings.focusEnabled) return;
+  if (!settings) return;
+  const now = Date.now();
   const today = dayKey();
+  const targets = new Map(); // dominio → "ct" | "limit"
+
+  const add = (domain, conf, limitUsed) => {
+    if ((conf.ctUntil || 0) > now) { targets.set(domain, "ct"); return; }
+    if (conf.schedule && !scheduleActive(conf.schedule)) return; // fuori fascia → nessun blocco
+    if (settings.focusEnabled && conf.limitMinutes > 0 && limitUsed() >= conf.limitMinutes * 60) {
+      targets.set(domain, "limit");
+    }
+  };
+
   for (const site of settings.sites) {
-    if (!site.active || !(site.limitMinutes > 0)) continue;
-    const used = (stats.byDay[today] && stats.byDay[today][site.domain]) || 0;
-    if (used < site.limitMinutes * 60) continue;
+    if (!site.active) {
+      if ((site.ctUntil || 0) > now) targets.set(site.domain, "ct");
+      continue;
+    }
+    add(site.domain, site, () => (stats.byDay[today] || {})[site.domain] || 0);
+  }
+  for (const conf of (settings.categories || [])) {
+    if (!conf.active) continue;
+    for (const domain of categoryDomains(settings, conf.id)) {
+      const site = settings.sites.find(s => s.domain === domain);
+      if (site && site.active) continue; // dominio governato dal singolo sito
+      add(domain, conf, () => categoryUsedSeconds(conf.id, stats, today, settings));
+    }
+  }
+
+  for (const [domain, kind] of targets) {
     try {
-      const tabs = await chrome.tabs.query({ url: ["*://" + site.domain + "/*", "*://*." + site.domain + "/*"] });
+      const tabs = await chrome.tabs.query({ url: ["*://" + domain + "/*", "*://*." + domain + "/*"] });
       for (const t of tabs) {
-        if (t.url && /^https?:/i.test(t.url)) intercept(t.id, t.url, "limit");
+        if (t.url && /^https?:/i.test(t.url)) intercept(t.id, t.url, kind === "ct" ? "ct" : "limit");
       }
     } catch { /* il tab può sparire durante la query: nessun problema */ }
   }
@@ -323,6 +526,45 @@ function sanitizeThemeColor(c) {
   };
 }
 
+// Fascia oraria settimanale: { days: [1..7], start, end } con start/end in minuti.
+function sanitizeSchedule(s) {
+  if (!s || typeof s !== "object") return null;
+  const days = Array.isArray(s.days)
+    ? [...new Set(s.days.map(Number).filter(n => n >= 1 && n <= 7))].sort((a, b) => a - b)
+    : [];
+  const start = Math.min(1439, Math.max(0, Math.round(Number(s.start) || 0)));
+  const end = Math.min(1440, Math.max(1, Math.round(Number(s.end) || 1440)));
+  if (!days.length || end <= start) return null;
+  return { days, start, end };
+}
+
+// Verifica "live" dello stato PRO per le azioni critiche (cold turkey, fasce
+// orarie): NON ci si fida mai della sola firma locale. Con ExtensionPay
+// configurato si interroga il server (extpay.getUser → user.paid); in sviluppo
+// (o finché EXT_PAY_ID è vuoto) l'unica fonte che approva è il toggle in Info.
+// Fallisce in modo conservativo (fail-closed): un errore di rete non sblocca
+// nulla; ogni "no" definitivo (non pagato, o ExtensionPay assente) rimuove
+// anche la firma UI, così una firma falsificata da sola non sblocca mai nulla.
+async function verifyProLive() {
+  if (await devProOn()) return true;
+  const ep = ensureExtPay();
+  if (!ep) {
+    await setProSig(false); // build senza ExtensionPay: la firma da sola non basta
+    return false;
+  }
+  try {
+    const user = await ep.getUser();
+    if (user && user.paid) {
+      await setProSig(true); // mantiene la UI sbloccata
+      return true;
+    }
+    await setProSig(false); // risposta netta "non pagato" → revoca la firma
+    return false;
+  } catch {
+    return false; // errore di rete: fail-closed, si conserva l'ultimo stato noto
+  }
+}
+
 function sanitizeSettings(s) {
   const out = { ...JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), ...(s || {}) };
   if (!Array.isArray(out.sites)) out.sites = [];
@@ -334,14 +576,43 @@ function sanitizeSettings(s) {
       delay: Math.min(30, Math.max(1, Math.round(Number(x.delay) || 5))),
       limitMinutes: Math.max(0, Math.round(Number(x.limitMinutes) || 0)),
       mode: x.mode === "block" ? "block" : "hold",
-      active: x.active !== false
+      active: x.active !== false,
+      ctUntil: Math.max(0, Math.round(Number(x.ctUntil) || 0)),   // PRO cold turkey
+      schedule: sanitizeSchedule(x.schedule)                       // PRO fasce orarie
     }))
     .filter(x => x.domain);
+  // categorie precompilate: la configurazione è fusa per id con il registry.
+  // `domains` (lista personalizzata, PRO) vuota = si usano i domini del registry.
+  const pro = out[_PRO_SIG] === _PRO_OK;
+  out.categories = CATEGORIES.map(cat => {
+    const conf = (out.categories || []).find(c => c && c.id === cat.id) || {};
+    const customDoms = pro && Array.isArray(conf.domains)
+      ? [...new Set(conf.domains.map(normalizeDomain).filter(Boolean))]
+      : [];
+    return {
+      id: cat.id,
+      active: conf.active === true,
+      mode: conf.mode === "block" ? "block" : "hold",
+      delay: Math.min(30, Math.max(1, Math.round(Number(conf.delay) || 5))),
+      limitMinutes: Math.max(0, Math.round(Number(conf.limitMinutes) || 0)),
+      ctUntil: Math.max(0, Math.round(Number(conf.ctUntil) || 0)),
+      schedule: sanitizeSchedule(conf.schedule),
+      domains: customDoms
+    };
+  });
   out.graceMinutes = Math.min(120, Math.max(0, Math.round(Number(out.graceMinutes) || 5)));
   out.fontScale = Math.min(1.2, Math.max(0.6, Number(out.fontScale) || 1));
   out.fontFamily = ["sans", "serif", "mono", "cursive"].includes(out.fontFamily) ? out.fontFamily : "sans";
   out.searchEngine = SEARCH_ENGINES[out.searchEngine] ? out.searchEngine : "google";
   out.showSearch = out.showSearch !== false;
+
+  // personalizzazione avanzata (immagine di sfondo + arrotondamento bordi)
+  out.bgImage = typeof out.bgImage === "string" ? out.bgImage.trim().slice(0, 2048) : "";
+  // mancante (null/"") o non numerico → fallback 8; altrimenti clamp 0 – 24
+  const borderRadiusNum = (out.borderRadius == null || out.borderRadius === "") ? NaN : Number(out.borderRadius);
+  out.borderRadius = Number.isFinite(borderRadiusNum)
+    ? Math.min(24, Math.max(0, Math.round(borderRadiusNum)))
+    : 8;
 
   // temi custom: nome libero (max 24 caratteri), tre colori RGB 0–255, id stabile
   out.customThemes = (Array.isArray(out.customThemes) ? out.customThemes : [])
@@ -354,9 +625,16 @@ function sanitizeSettings(s) {
       accent: sanitizeThemeColor(x.accent)
     }));
   const customIds = new Set(out.customThemes.map(t => t.id));
-  out.theme = FIXED_THEMES.includes(out.theme) || customIds.has(out.theme) ? out.theme : "midnight";
+  // un tema PRO è ammesso solo con la firma (le anteprime dei non-PRO non vengono
+  // mai persistite: vivono solo in memoria nelle impostazioni)
+  const proThemeOk = PRO_THEME_IDS.includes(out.theme) && pro;
+  out.theme = FIXED_THEMES.includes(out.theme) || customIds.has(out.theme) || proThemeOk
+    ? out.theme
+    : "midnight";
 
   out.pinHash = typeof out.pinHash === "string" ? out.pinHash : null;
   out.lang = LANGUAGES[out.lang] ? out.lang : "auto";
+  // firma PRO opaca (solo segnale UI: le azioni critiche passano da verifyProLive)
+  out[_PRO_SIG] = out[_PRO_SIG] === _PRO_OK ? _PRO_OK : null;
   return out;
 }

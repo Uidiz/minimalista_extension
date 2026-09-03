@@ -558,6 +558,535 @@ async function main() {
   });
   check("font aggiornato anche nella dashboard già aperta", !!dashFont, dashFont || "");
 
+  /* ---------- 11. personalizzazione avanzata: sfondo + arrotondamento ---------- */
+  console.log("11. Personalizzazione avanzata (immagine di sfondo e arrotondamento)");
+  // la lingua è ancora "en" (sezione 8b): la card deve risultare tradotta
+  const advTitle = await evaluate(optSess, `(() => {
+    const cards = [...document.querySelectorAll('#sec-appearance .card')];
+    const card = cards.find(c => {
+      const h = c.querySelector('h2');
+      return h && h.dataset.i18n === 'advanced_title';
+    });
+    return card ? card.querySelector('h2').textContent.trim() : '';
+  })()`);
+  check("card 'Avanzate' presente in Aspetto (tradotta: Advanced)", advTitle === "Advanced", advTitle || "card mancante");
+
+  const advControls = await evaluate(optSess, `(() => {
+    const bg = document.getElementById('bgImage');
+    const r = document.getElementById('borderRadius');
+    return !!(bg && r && document.getElementById('borderRadiusVal')
+      && document.getElementById('borderRadiusReset')
+      && r.min === '0' && r.max === '24' && r.step === '1' && r.value === '8');
+  })()`);
+  check("controlli avanzati renderizzati (URL sfondo, slider 0–24, valore, reset)", advControls === true);
+
+  // 11a. slider: input → anteprima live, change → salvataggio
+  const liveRadius = await waitFor(async () => {
+    await evaluate(optSess, `(() => {
+      const r = document.getElementById('borderRadius');
+      r.value = '20';
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    const v = await evaluate(optSess, `(() => {
+      const cssVar = document.documentElement.style.getPropertyValue('--border-radius').trim();
+      const val = document.getElementById('borderRadiusVal').textContent;
+      const card = document.querySelector('#sec-appearance .card');
+      return cssVar === '20px' && val === '20px'
+        && getComputedStyle(card).borderRadius === '26px'          // card = radius + 6px
+        && getComputedStyle(document.getElementById('bgImage')).borderRadius === '20px'
+        ? true : null;
+    })()`);
+    return v || null;
+  });
+  check("anteprima live arrotondamento (var 20px, card 26px, input 20px)", liveRadius === true);
+
+  await evaluate(optSess, `(() => {
+    const r = document.getElementById('borderRadius');
+    r.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  const radiusSaved = await waitFor(async () => {
+    const s = await evaluate(optSess, `(async () => (await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})))).borderRadius)()`);
+    return s === 20 ? s : null;
+  });
+  check("arrotondamento persistito (storage borderRadius = 20)", radiusSaved === 20);
+
+  const dashRadius = await waitFor(async () => {
+    const v = await evaluate(dashSess, "document.documentElement.style.getPropertyValue('--border-radius').trim()");
+    return v === '20px' ? v : null;
+  });
+  check("dashboard già aperta aggiornata in tempo reale (--border-radius 20px)", dashRadius === "20px", dashRadius || "");
+
+  // 11b. reset → torna a 8 (UI + storage)
+  const resetRadius = await waitFor(async () => {
+    await evaluate(optSess, `(() => { document.getElementById('borderRadiusReset').click(); return true; })()`);
+    const ui = await evaluate(optSess, `(() => {
+      const r = document.getElementById('borderRadius');
+      return r.value === '8' && document.getElementById('borderRadiusVal').textContent === '8px' ? true : null;
+    })()`);
+    if (!ui) return null;
+    const s = await evaluate(optSess, `(async () => (await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})))).borderRadius)()`);
+    return s === 8 ? true : null;
+  });
+  check("reset arrotondamento → 8px (slider, etichetta e storage)", resetRadius === true);
+
+  // 11c. immagine di sfondo: anteprima live, persistenza, propagazione alla dashboard
+  const bgLive = await waitFor(async () => {
+    await evaluate(optSess, `(() => {
+      const bg = document.getElementById('bgImage');
+      bg.value = 'https://example.com/bg.png';
+      bg.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    const ok = await evaluate(optSess, `(() => {
+      const v = document.documentElement.style.getPropertyValue('--bg-img');
+      return v === 'url("https://example.com/bg.png")' ? true : null;
+    })()`);
+    return ok || null;
+  });
+  check("anteprima live sfondo (--bg-img url corretta)", bgLive === true);
+  await evaluate(optSess, `(() => {
+    const bg = document.getElementById('bgImage');
+    bg.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  const bgSaved = await waitFor(async () => {
+    const s = await evaluate(optSess, `(async () => (await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})))).bgImage)()`);
+    return s === 'https://example.com/bg.png' ? s : null;
+  });
+  check("immagine di sfondo persistita (storage bgImage)", bgSaved === "https://example.com/bg.png", bgSaved || "");
+  const bgApplied = await waitFor(async () => {
+    const ok = await evaluate(dashSess, `(() => {
+      const v = document.documentElement.style.getPropertyValue('--bg-img');
+      return v === 'url("https://example.com/bg.png")' ? true : null;
+    })()`);
+    return ok || null;
+  });
+  check("sfondo applicato anche alla dashboard già aperta", bgApplied === true);
+
+  // 11d. l'URL dello sfondo non deve permettere CSS injection (doppi apici escapati)
+  // 11d. l'URL dello sfondo non deve permettere CSS injection: i doppi apici interni
+  // vengono escapati, quindi lo sfondo resta un unico url(...) e non nasce alcuna
+  // nuova dichiarazione (es. un background-color rosso).
+  const noInjection = await evaluate(optSess, `(() => {
+    const bg = document.getElementById('bgImage');
+    bg.value = 'https://example.com/x");background:red;color:red;/*';
+    bg.dispatchEvent(new Event('input', { bubbles: true }));
+    const bgImg = getComputedStyle(document.body).backgroundImage;
+    const bgColor = getComputedStyle(document.body).backgroundColor;
+    return bgColor !== 'rgb(255, 0, 0)' && bgColor !== 'red'
+      && bgImg.indexOf('example.com') >= 0   // lo sfondo è ancora l'immagine richiesta
+      && bgImg.indexOf('background:red') >= 0 // …con l'intero testo dentro l'url() (non troncato)
+      ? true : null;
+  })()`);
+  check("URL con doppi apici non genera CSS injection", noInjection === true);
+
+  // pulizia: rimuove l'anteprima iniettata e ripristina lo stato pulito
+  await evaluate(optSess, `(() => {
+    const bg = document.getElementById('bgImage');
+    bg.value = '';
+    bg.dispatchEvent(new Event('input', { bubbles: true }));
+    bg.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+
+  // 11e. sanitizzazione lato background: clamp 0–24 e trim dell'URL
+  const sanitized = await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})));
+    s.borderRadius = 99;
+    s.bgImage = '   https://example.com/bg.png   ';
+    const resp = await chrome.runtime.sendMessage({ type: 'saveSettings', settings: s });
+    await new Promise(r => setTimeout(r, 600));
+    const s2 = await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})));
+    return resp && resp.ok ? { br: s2.borderRadius, bg: s2.bgImage } : null;
+  })()`);
+  check("sanitizzazione: borderRadius clampato a 24, bgImage trimmata", !!sanitized && sanitized.br === 24 && sanitized.bg === "https://example.com/bg.png", sanitized ? JSON.stringify(sanitized) : "");
+
+  /* ---------- 12. categorie + PRO (cold turkey, fasce orarie) ---------- */
+  console.log("12. Categorie di siti e funzioni PRO");
+  // stato noto: un solo sito singolo (example.com, id 1) + nessuna categoria attiva
+  await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    s.sites = [{ id: 1, domain: "example.com", delay: 2, limitMinutes: 0, mode: "hold", active: true }];
+    s.categories = s.categories.map(c => ({ ...c, active: false, limitMinutes: 0, mode: "hold", ctUntil: 0, schedule: null }));
+    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+    await chrome.runtime.sendMessage({ type: "resetStats" });
+    return true;
+  })()`);
+  await sleep(400);
+  // ricarica le impostazioni nella pagina (la UI salva dal proprio stato in memoria)
+  await cdp("Page.reload", {}, optSess);
+  await waitFor(async () => {
+    const ok = await evaluate(optSess, "typeof onCtStart === 'function' && document.querySelectorAll('#siteRows .site-row').length >= 1");
+    return ok ? true : null;
+  });
+  await sleep(400);
+
+  const catRows = await waitFor(async () => {
+    const n = await evaluate(optSess, "document.querySelectorAll('#catRows .cat-row').length");
+    return n === 6 ? n : null;
+  });
+  check("6 categorie precompilate renderizzate", catRows === 6, "righe: " + catRows);
+  check("categorie presenti nello storage sanitizzato", !!(await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    return s.categories && s.categories.length === 6 && s.categories.every(c => c.id);
+  })()`)));
+
+  // attiva la categoria "video" dall'interfaccia
+  const catActivated = await waitFor(async () => {
+    await evaluate(optSess, `(() => {
+      const row = document.querySelector('.cat-row[data-cat="video"]');
+      if (!row) return null;
+      const cb = row.querySelector('.cat-active');
+      if (!cb.checked) cb.click();
+      return true;
+    })()`);
+    const on = await evaluate(optSess, `(async () => {
+      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      const c = (s.categories || []).find(x => x.id === "video");
+      return c && c.active === true ? true : null;
+    })()`);
+    return on || null;
+  });
+  check("attivazione categoria dall'interfaccia (persistita)", catActivated === true);
+
+  // un dominio della categoria (netflix.com, non configurato singolarmente) viene intercettato
+  const catTab = await createTarget("about:blank");
+  const catSess = await attach(catTab);
+  await sleep(400);
+  await cdp("Page.navigate", { url: "https://netflix.com/" }, catSess);
+  const catBlock = await waitFor(async () => {
+    const href = await evaluate(catSess, "location.href");
+    return href.includes("block.html") && href.includes("r=hold") ? href : null;
+  });
+  check("dominio della categoria intercettato (tieni premuto)", !!catBlock, catBlock || "");
+
+  // limite aggregato: 60 min condivisi tra tutti i domini della categoria
+  await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    const c = s.categories.find(x => x.id === "video");
+    c.limitMinutes = 1;
+    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+    const d = new Date();
+    const today = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    await chrome.storage.local.set({ stats: { byDay: { [today]: { "youtube.com": 99999 } }, blocked: {}, unlocks: {} } });
+    return true;
+  })()`);
+  await sleep(500);
+  await cdp("Page.navigate", { url: "https://youtube.com/" }, catSess);
+  const catLimit = await waitFor(async () => {
+    const href = await evaluate(catSess, "location.href");
+    return href.includes("block.html") && href.includes("r=limit") && href.includes("c=video") ? href : null;
+  });
+  check("budget aggregato di categoria superato → blocco 'limit' (c=video)", !!catLimit, catLimit || "");
+  // ripristino: categoria spenta e statistiche pulite
+  await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    const c = s.categories.find(x => x.id === "video");
+    c.active = false; c.limitMinutes = 0;
+    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+    await chrome.runtime.sendMessage({ type: "resetStats" });
+    return true;
+  })()`);
+
+  // PRO: bloccata di default, il segnale locale non basta
+  const proLocked = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      return !document.getElementById("proTools").hidden && !document.getElementById("proLocked").hidden ? null
+        : document.getElementById("proLocked").hidden === false ? true : null;
+    })()`);
+    return r || null;
+  });
+  check("strumenti PRO bloccati senza abbonamento", proLocked === true);
+
+  // Temi PRO: presenti in una griglia dedicata con una card per tema del registry
+  const proThemeCount = await evaluate(optSess, `(() => {
+    const grid = document.getElementById("proThemeGrid");
+    const n = grid ? document.querySelectorAll("#proThemeGrid .theme-card.pro").length : -1;
+    return n === Number(grid.dataset.total) && n > 0 ? n : null;
+  })()`);
+  check("temi PRO: card renderizzate come nel registry", !!proThemeCount, "temi: " + proThemeCount);
+
+  // anteprima gratuita: il click su un tema PRO bloccato mostra la barra, applica
+  // il gradiente in memoria e NON persiste il tema nello storage
+  const themeBefore = await evaluate(optSess, `(async () =>
+    (await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})))).theme)()`);
+  const previewShown = await waitFor(async () => {
+    const out = await evaluate(optSess, `(() => {
+      const card = document.querySelector('#proThemeGrid .theme-card.pro[data-pro-theme="pr-aurora"]');
+      const bar = document.getElementById("proPreviewBar");
+      const st = getComputedStyle(document.documentElement);
+      const gradOk = (st.getPropertyValue("--bg-grad") || "").includes("linear-gradient");
+      if (bar && bar.hidden && card) card.click(); // entra in anteprima solo se non già attiva
+      if (bar && bar.hidden === false && gradOk) return document.getElementById("proPreviewName").textContent;
+      return null;
+    })()`);
+    return out || null;
+  });
+  check("anteprima tema PRO per i free: barra visibile + gradiente applicato", previewShown === "Aurora", previewShown || "");
+  const themeAfter = await evaluate(optSess, `(async () =>
+    (await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})))).theme)()`);
+  check("l'anteprima non persiste il tema PRO", themeAfter === themeBefore, `prima: ${themeBefore} dopo: ${themeAfter}`);
+  const previewClosed = await waitFor(async () => {
+    await evaluate(optSess, `(() => { document.getElementById("proPreviewClose").click(); return true; })()`);
+    const out = await evaluate(optSess, `(() => {
+      const st = getComputedStyle(document.documentElement);
+      return document.getElementById("proPreviewBar").hidden === true
+        && !(st.getPropertyValue("--bg-grad") || "").includes("linear-gradient") ? true : null;
+    })()`);
+    return out || null;
+  });
+  check("chiusura anteprima: barra nascosta e gradiente rimosso", previewClosed === true);
+
+  // la LISTA dei siti di ogni categoria è visibile anche gratis (espandendo la riga)
+  const catListSeen = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      const row = document.querySelector('.cat-row[data-cat="social"]');
+      if (!row) return null;
+      if (!row.classList.contains("open")) {
+        const head = row.querySelector(".cat-head");
+        if (head) { head.click(); return "opening"; }
+        return null;
+      }
+      const chips = [...row.querySelectorAll(".cat-domain-chips .chip")].map(c => c.textContent.trim());
+      return chips.includes("instagram.com") && chips.length > 0 ? chips : null;
+    })()`);
+    return Array.isArray(r) && r.length ? r.length : null;
+  });
+  check("lista dei siti della categoria visibile per tutti (es. instagram.com)", !!catListSeen);
+
+  // modificare la lista è PRO: il bottone dietro il lucchetto mostra l'avviso
+  const catGateFree = await evaluate(optSess, `(async () => {
+    const btn = document.querySelector('.cat-row[data-cat="social"] [data-edit-gate]');
+    if (!btn) return null;
+    btn.click();
+    const s0 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    const msg = document.querySelector('.cat-row[data-cat="social"] .cat-msg');
+    const doms = (s0.categories.find(c => c.id === "social") || {}).domains || [];
+    return { msg: msg ? msg.textContent : "", noCustom: doms.length === 0 };
+  })()`);
+  check("modifica siti categoria bloccata per i free (avviso, nessuna lista custom)",
+    catGateFree && catGateFree.msg.length > 0 && catGateFree.noCustom === true,
+    catGateFree ? JSON.stringify(catGateFree) : "");
+
+  // interfaccia di sblocco PRO (ExtensionPay): pulsanti presenti dietro il lucchetto
+  const payUi = await evaluate(optSess, `(async () => {
+    const row = document.getElementById("proPayRow");
+    const unlock = document.getElementById("proUnlock");
+    const login = document.getElementById("proLogin");
+    return row && unlock && login && row.hidden === false
+      && unlock.textContent.trim().length > 0 && login.textContent.trim().length > 0;
+  })()`);
+  check("UI di sblocco PRO presente (bottone acquisto + login)", payUi === true);
+
+  // build di sviluppo (EXT_PAY_ID vuoto): il click sul pulsante non apre pagine e mostra l'avviso
+  const unconf = await evaluate(optSess, `(async () => {
+    document.getElementById("proMsg").textContent = "";
+    await onProUnlock();
+    await new Promise(r => setTimeout(r, 300));
+    return document.getElementById("proMsg").textContent.length > 0
+      && !location.href.includes("extensionpay.com");
+  })()`);
+  check("senza EXT_PAY_ID il pulsante mostra l'avviso di build non configurata", unconf === true);
+
+  // proRefresh: senza ExtensionPay configurato (e senza toggle) risponde paid:false senza toccare la firma
+  const proRefresh = await evaluate(optSess, `(async () => {
+    const s0 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    const resp = await chrome.runtime.sendMessage({ type: "proRefresh" });
+    await new Promise(r => setTimeout(r, 300));
+    const s1 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    return { ok: resp && resp.ok, paid: resp && resp.paid, sig0: s0._aT, sig1: s1._aT };
+  })()`);
+  check("proRefresh senza ExtensionPay: ok, paid:false, firma invariata",
+    proRefresh && proRefresh.ok === true && proRefresh.paid === false && proRefresh.sig0 === proRefresh.sig1,
+    proRefresh ? JSON.stringify(proRefresh) : "");
+
+  const forged = await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    s._aT = "x8f9q"; // firma falsificata: la UI lo mostrerebbe come PRO…
+    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+    const resp = await chrome.runtime.sendMessage({ type: "coldTurkey", kind: "site", id: 1, hours: 1, days: 0 });
+    await new Promise(r => setTimeout(r, 400));
+    const s2 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    return { ok: resp && resp.ok, reason: resp && resp.reason, sig: s2._aT };
+  })()`);
+  check("senza verifica live il cold turkey è rifiutato e la firma locale viene rimossa",
+    forged && forged.ok !== true && forged.reason === "pro" && !forged.sig, forged ? JSON.stringify(forged) : "");
+
+  // toggle di sviluppo (Info) → strumenti PRO visibili e attivazione possibile
+  const devOn = await waitFor(async () => {
+    await evaluate(optSess, `(() => {
+      const t = document.getElementById("proTestToggle");
+      if (!t.checked) t.click();
+      return true;
+    })()`);
+    const r = await evaluate(optSess, `(async () => {
+      const d = await new Promise(r => chrome.storage.local.get("_devPro", o => r(o._devPro)));
+      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      return d === true && s._aT === "x8f9q" && document.getElementById("proTools").hidden === false ? true : null;
+    })()`);
+    return r || null;
+  });
+  check("toggle di sviluppo: strumenti PRO visibili", devOn === true);
+
+  // con PRO attivo un tema gradiente si applica e si salva (firma presente)
+  const proThemeApplied = await waitFor(async () => {
+    const out = await evaluate(optSess, `(async () => {
+      const read = async () => {
+        const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+        const sel = document.querySelector("#proThemeGrid .theme-card.pro.selected");
+        return s.theme === "pr-lagoon" && s._aT === "x8f9q" && sel && sel.dataset.proTheme === "pr-lagoon"
+          ? s.theme : null;
+      };
+      let v = await read();
+      if (!v) {
+        const card = document.querySelector('#proThemeGrid .theme-card.pro[data-pro-theme="pr-lagoon"]');
+        if (card) card.click();
+        await new Promise(r => setTimeout(r, 400));
+        v = await read();
+      }
+      return v || null;
+    })()`);
+    return out || null;
+  });
+  check("con PRO attivo il tema gradiente si applica e si salva", proThemeApplied === "pr-lagoon", proThemeApplied || "");
+
+  // PRO: aggiunta di un dominio personalizzato a una categoria dall'interfaccia
+  const catEdited = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      const row = document.querySelector('.cat-row[data-cat="shopping"]');
+      if (!row) return null;
+      if (!row.classList.contains("open")) { const h = row.querySelector(".cat-head"); if (h) h.click(); return "opening"; }
+      if (!row.querySelector(".cat-dom-input")) {
+        const start = row.querySelector("[data-edit-start]");
+        if (start) { start.click(); return "opening-edit"; }
+        return null;
+      }
+      return "ready";
+    })()`);
+    if (r === "ready") {
+      const done = await evaluate(optSess, `(async () => {
+        const row = document.querySelector('.cat-row[data-cat="shopping"]');
+        const input = row.querySelector(".cat-dom-input");
+        input.value = "testshop.example";
+        row.querySelector(".cat-dom-add").click();
+        await new Promise(r2 => setTimeout(r2, 500));
+        const s = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
+        const doms = (s.categories.find(c => c.id === "shopping") || {}).domains || [];
+        return doms.includes("testshop.example") ? doms : null;
+      })()`);
+      return done ? done : null;
+    }
+    return null;
+  });
+  check("PRO: dominio personalizzato aggiunto a una categoria dall'interfaccia",
+    !!(catEdited && catEdited.includes("testshop.example")), "");
+
+  const ctStarted = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      const sel = document.getElementById("ctTarget");
+      if (![...sel.options].some(o => o.value === "site:1")) return null;
+      sel.value = "site:1";
+      document.getElementById("ctHours").value = "1";
+      document.getElementById("ctDays").value = "0";
+      const before = Date.now();
+      let err = null;
+      try { await onCtStart(); } catch (e) { err = String((e && e.message) || e); }
+      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      const site = s.sites.find(x => String(x.id) === "1");
+      return site && site.ctUntil > before
+        ? { until: site.ctUntil }
+        : { until: site && site.ctUntil, err, sig: s._aT, msg: document.getElementById("ctMsg").textContent };
+    })()`);
+    return r && r.until ? { until: r.until } : null;
+  });
+  check("cold turkey attivato dall'interfaccia (ctUntil futuro)", !!ctStarted, ctStarted ? JSON.stringify(ctStarted) : "");
+
+  const ctRowLocked = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      const row = document.querySelector('.site-row[data-id="1"]');
+      if (!row) return null;
+      const toggle = row.querySelector(".site-active");
+      const chip = row.querySelector(".chip.ct-chip");
+      return toggle && toggle.disabled === true && chip ? true : null;
+    })()`);
+    return r || null;
+  });
+  check("riga del sito bloccata nell'interfaccia (toggle disabilitato + chip ⛓)", ctRowLocked === true);
+
+  // il blocco ferreo ignora anche il periodo di grazia
+  const ctTabId = await evaluate(optSess, `(async () => (await chrome.tabs.create({ url: "about:blank" })).id)()`);
+  await evaluate(optSess, `(async () => {
+    await chrome.runtime.sendMessage({ type: "unlock", tabId: ${ctTabId} }); // grazia concessa…
+    await chrome.tabs.update(${ctTabId}, { url: "https://example.com/" });
+    return true;
+  })()`);
+  const ctBlock = await waitFor(async () => {
+    const url = await evaluate(optSess, `(async () => (await chrome.tabs.get(${ctTabId})).url || "")()`);
+    return url.includes("block.html") && url.includes("r=ct") ? url : null;
+  }, 15000);
+  check("cold turkey blocca anche con periodo di grazia attivo (r=ct)", !!ctBlock, (ctBlock || "").slice(0, 60));
+
+  // fasce orarie (su un secondo sito, così il cold turkey di example.com non interferisce)
+  await evaluate(optSess, `(async () => {
+    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+    s.sites.push({ id: 98, domain: "example.org", delay: 2, limitMinutes: 0, mode: "hold", active: true });
+    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+    return true;
+  })()`);
+  await sleep(400);
+  const isoDay = await evaluate(optSess, `new Date().getDay() === 0 ? 7 : new Date().getDay()`);
+  const otherDay = isoDay === 1 ? 2 : 1; // un giorno diverso da oggi
+  await evaluate(optSess, `(async () => {
+    const resp = await chrome.runtime.sendMessage({
+      type: "proSchedule", kind: "site", id: 98,
+      schedule: { days: [${otherDay}], start: 0, end: 1440 }
+    });
+    return resp && resp.ok;
+  })()`);
+  await sleep(400);
+  const schedTab = await createTarget("about:blank");
+  const schedSess = await attach(schedTab);
+  await sleep(400);
+  await cdp("Page.navigate", { url: "https://example.org/" }, schedSess);
+  const navPassed = await waitFor(async () => {
+    const href = await evaluate(schedSess, "location.href");
+    return href.startsWith("https://example.org") ? href : null;
+  }, 8000);
+  check("fuori fascia oraria il sito NON viene intercettato", !!navPassed, "");
+  // ora dentro fascia (oggi, tutto il giorno)
+  await evaluate(optSess, `(async () => {
+    const resp = await chrome.runtime.sendMessage({
+      type: "proSchedule", kind: "site", id: 98,
+      schedule: { days: [${isoDay}], start: 0, end: 1440 }
+    });
+    return resp && resp.ok;
+  })()`);
+  await sleep(400);
+  // URL univoco: la navigazione verso lo stesso URL potrebbe non generare onBeforeNavigate
+  await cdp("Page.navigate", { url: "https://example.org/?t=2" }, schedSess);
+  const schedBlock = await waitFor(async () => {
+    const href = await evaluate(schedSess, "location.href");
+    return href.includes("block.html") ? href : null;
+  });
+  check("dentro la fascia oraria il sito viene intercettato", !!schedBlock, schedBlock || "");
+
+  // pulizia: toggle di sviluppo spento → strumenti PRO di nuovo bloccati
+  await evaluate(optSess, `(() => {
+    const t = document.getElementById("proTestToggle");
+    if (t.checked) t.click();
+    return true;
+  })()`);
+  const devOff = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      const d = await new Promise(r => chrome.storage.local.get("_devPro", o => r(o._devPro)));
+      return d !== true && document.getElementById("proLocked").hidden === false ? true : null;
+    })()`);
+    return r || null;
+  });
+  check("toggle di sviluppo spento: strumenti PRO di nuovo bloccati", devOff === true);
+
   console.log(`\nRisultato: ${passed} passati, ${failed} falliti`);
   return failed === 0 ? 0 : 1;
 }

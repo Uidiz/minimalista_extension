@@ -4,8 +4,9 @@
 > Concetto portante: quando tenti di aprire un sito distraente, l'estensione ti ferma e
 > ti chiede un gesto **intenzionale** (tenere premuto) prima di lasciarti passare; in più
 > puoi imporre un **limite giornaliero** di utilizzo per sito.
-> Tutti i dati restano **solo sul dispositivo** (`chrome.storage.local`): nessun dato viene
-> inviato a nessun server.
+> Tutti i dati restano **solo sul dispositivo** (`chrome.storage.local`). L'unica comunicazione
+> esterna è la verifica dello stato PRO (pagamento) tramite **ExtensionPay**: nessun contenuto
+> personale lascia il dispositivo.
 
 ---
 
@@ -66,6 +67,11 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   il cambio lingua aggiorna all'istante tutte le pagine aperte.
 - **Motore di ricerca** della barra in nuova scheda (Google, DuckDuckGo, Bing, Brave), in Aspetto.
 - Mostra/nascondi la **barra di ricerca web** sulla nuova scheda (Aspetto → Nuova scheda).
+- **Immagine di sfondo e arrotondamento bordi** (Aspetto → Avanzate): URL di un'immagine di
+  sfondo in copertura fissa (tutte le pagine tranne la pagina di blocco, che non carica
+  `common.css`) e raggio degli angoli dell'interfaccia (0–24 px) esposto come CSS variable
+  `--border-radius`; card e dialog lo derivano con `calc()` per mantenere le proporzioni.
+  L'URL viene sanificato contro la CSS injection prima di essere iniettato in `--bg-img`.
 
 ### 2.5 Sicurezza
 - **PIN facoltativo** che protegge la pagina delle impostazioni (SHA-256 locale): senza PIN non si
@@ -75,6 +81,49 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 ### 2.6 Popup (icona nella barra)
 - Interruttore Focus + riepilogo del giorno + link a dashboard e impostazioni.
 
+### 2.7 Categorie di siti (per tutti i piani)
+- Sei macro-categorie precompilate (Social, Video, News, Adulti, Giochi, Shopping) con domini
+  **disgiunti** tra loro: registry `CATEGORIES` in `common.js`, configurazione per categoria in
+  `settings.categories`. Ogni categoria ha toggle attivo/inattivo, modalità "tieni premuto"/
+  "blocca", ritardo e limite giornaliero, come i singoli siti.
+- Il limite di categoria è un **budget aggregato**: conta i minuti spesi su *tutti* i domini
+  della categoria (il tracker li registra sul dominio canonico, così il calcolo è immediato).
+  Superato il budget, i domini della categoria restano bloccati per il resto della giornata;
+  la pagina di blocco riceve `r=limit&c=<id>` e mostra il tempo totale già speso.
+- Un dominio può stare sia in un sito singolo sia in una categoria (es. `instagram.com` è un
+  default ed è in "Social"): la configurazione del **singolo sito ha precedenza**
+  sull'intercettazione, ma il suo tempo continua a confluire nel budget aggregato della
+  categoria (il tracker registra sempre il dominio canonico del sito configurato).
+
+### 2.8 Funzioni PRO (Cold Turkey + fasce orarie)
+- **Cold Turkey** 🔥 (per sito o categoria): blocco totale e irreversibile per X ore/giorni.
+  Vince su tutto — anche su Focus spento, sul limite e sul periodo di grazia — e non si può
+  annullare né ridurre (nemmeno dal PIN); l'interfaccia disabilita le righe coinvolte con un
+  countdown ⛓ fino alla scadenza.
+- **Fasce orarie settimanali** (per sito o categoria): finestre di attivazione del blocco
+  (giorni della settimana + orario, es. lun–ven 09:00–18:00). Fuori fascia il target non
+  viene intercettato; dentro fascia si comporta secondo la sua modalità di base.
+- L'attivazione di entrambe passa da una **verifica live** dello stato PRO (sezione 5.9).
+
+### 2.9 Modalità in incognito
+- Con la categoria **Adulti** attiva, le impostazioni controllano
+  `chrome.extension.isAllowedIncognitoAccess()`: se l'accesso in incognito è disabilitato
+  mostrano un banner con un bottone che apre `chrome://extensions/?id=<id-estensione>`
+  (spunta "Consenti in incognito").
+
+### 2.10 Pagamenti PRO (ExtensionPay)
+- L'acquisto (piano **Lifetime**) è gestito da **ExtensionPay**: la libreria `ExtPay.js` è
+  inclusa nel progetto (vendored dal pacchetto npm `extpay` v3.1.2, licenza AGPL-3.0) e
+  inizializzata nel service worker (`startBackground`) e nelle impostazioni con l'ID
+  registrato su extensionpay.com (`EXT_PAY_ID` in `common.js`).
+- Dietro il lucchetto PRO: bottone **"Sblocca PRO (Lifetime)"** → `extpay.openPaymentPage()`
+  e **"Ho già pagato? Accedi"** → `extpay.openLoginPage()`. Dopo il pagamento la pagina
+  impostazioni interroga lo stato con un polling breve: i lucchetti spariscono all'istante
+  e compare il messaggio di ringraziamento.
+- Viene verificato **solo lo stato di pagamento** (nessun contenuto personale). Nessun
+  `content_scripts` su extensionpay.com: niente permessi aggiuntivi in fase di installazione
+  (il real-time usa polling, non push).
+
 ---
 
 ## 3. Struttura dei file
@@ -82,26 +131,31 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 | File | Ruolo |
 |---|---|
 | `manifest.json` | Manifest MV3 |
-| `background.js` | Service worker: intercettazione, limiti, tracciamento, messaggi |
-| `common.js` | Modulo condiviso: impostazioni, temi, utilità domini/dati |
+| `background.js` | Service worker: intercettazione (siti + categorie), limiti, tracciamento, messaggi, verifica live PRO (ExtensionPay) |
+| `common.js` | Modulo condiviso: impostazioni, temi, registry categorie, configurazione PRO/ExtensionPay, utilità domini/dati |
 | `block.html` / `block.css` / `block.js` | Pagina di blocco con "tieni premuto" |
 | `dashboard.html` / `dashboard.css` / `dashboard.js` | Nuova scheda (home minimalista) |
 | `options.html` / `options.css` / `options.js` | Pagina impostazioni |
 | `popup.html` / `popup.css` / `popup.js` | Popup dell'estensione |
 | `common.css` | Stili base condivisi (variabili di tema, card, switch, input) |
 | `i18n.js` | Modulo di localizzazione: registro lingue, dizionari (it/en/es/fr/de/pt), `t()`, `applyI18n()` |
+| `ExtPay.js` | Libreria vendored di ExtensionPay v3.1.2 (pagamenti PRO) — **licenza AGPL-3.0** |
 | `_locales/<lang>/messages.json` | Nome e descrizione localizzati del manifest (`default_locale: it`) |
 | `icons/` | Icone 16/32/48/128 derivate da `m.png` |
 | `m.png` | Icona originale dell'app (512×512) |
 | `tools/resize-icons.js` | Script Node puro per rigenerare le icone da `m.png` |
 | `tools/setup-cft.cjs` | Scarica Chrome for Testing per i test (cache in `~/.cache/minimalista-cft`) |
-| `e2e-test.js` | Test end-to-end (17 verifiche) |
+| `e2e-test.js` | Test end-to-end (64 verifiche) |
 
 ### Manifest (`manifest.json`)
 - **MV3**, service worker in background, nessuna pagina `background.html`.
 - **Permissions**: `storage`, `tabs`, `webNavigation`, `alarms`.
   - Nessun `host_permissions`: l'intercettazione avviene tramite l'API `webNavigation`
     (evento `onBeforeNavigate`), che non richiede accesso agli host.
+- **ExtensionPay non aggiunge permessi**: la verifica dello stato PRO è una `fetch` verso
+  `https://extensionpay.com` dal service worker e dalle pagine (nessun `content_scripts`, il
+  real-time post-pagamento usa polling; `ExtPay.js` è caricato via `importScripts` nel worker
+  e come `<script>` nelle impostazioni).
 - `chrome_url_overrides.newtab` → `dashboard.html`: la nuova scheda diventa la dashboard.
 - `options_ui.open_in_tab` → la pagina impostazioni si apre in una scheda.
 - `action.default_popup` → `popup.html`.
@@ -133,6 +187,18 @@ settings: {
   showSeconds: boolean,
   lang: "auto" | "it" | "en" | "es" | "fr" | "de" | "pt",  // lingua UI; "auto" = lingua del browser
   pinHash: string | null          // SHA-256 del PIN (null = nessun PIN)
+  bgImage: string,                // URL immagine di sfondo ("" = nessuna) — Aspetto → Avanzate
+  borderRadius: number,           // arrotondamento UI in px (0–24, default 8)
+  categories: [{                  // configurazione per categoria (fusa col registry CATEGORIES)
+    id: "social"|"video"|"news"|"adulti"|"gaming"|"shopping",
+    active: boolean,              // toggle attivo/inattivo
+    mode: "hold" | "block",
+    delay: number,                // secondi di "tieni premuto" (1–30)
+    limitMinutes: number,         // budget giornaliero AGGREGATO di categoria (0 = nessuno)
+    ctUntil: number,              // PRO cold turkey: timestamp di scadenza (0 = nessuno)
+    schedule: null | { days: number[], start: number, end: number }  // PRO fasce orarie settimanali
+  }],
+  _aT: "x8f9q" | null             // firma PRO per la UI (vedi 5.9): SOLO segnale d'interfaccia
 }
 
 todo: [{ id, text, done, priority: "high"|"medium"|"low", due: "none"|"today"|"tomorrow"|"YYYY-MM-DD" }]
@@ -146,6 +212,11 @@ stats: {
   blocked: { "YYYY-MM-DD": count },                   // tentativi intercettati
   unlocks: { "YYYY-MM-DD": count }                    // sblocchi completati
 }
+```
+
+Altre chiavi di `chrome.storage.local`:
+```js
+_devPro: boolean   // toggle di sviluppo PRO (Info → "PRO — solo sviluppo"): da rimuovere prima della pubblicazione
 ```
 
 Stato volatile (`chrome.storage.session`):
@@ -163,7 +234,8 @@ grace: { [tabId]: timestampScadenza }   // periodi di grazia attivi per scheda
                  ┌──────────────────────────────────────────────┐
                  │              background.js (SW)               │
                  │                                                │
-   navigazioni ──▶ onBeforeNavigate ──▶ verifica sito/limite ──▶ tabs.update → block.html
+   navigazioni ──▶ onBeforeNavigate ──▶ verifica sito/categoria/ ──▶ tabs.update → block.html
+                 │                         limite (budget aggregato)
                  │                                                │
    attivazione ─▶ tabs.onActivated / onUpdated / onRemoved        │
    finestre  ───▶ windows.onFocusChanged                          │
@@ -175,8 +247,9 @@ grace: { [tabId]: timestampScadenza }   // periodi di grazia attivi per scheda
                  │        ▼                                       │
                  │   stats.byDay[data][dominio] += secondi        │
                  │                                                │
-   messaggi ────▶ onMessage: getState | saveSettings | setFocus   │
-                 │            | unlock | resetStats               │
+   messaggi ────▶ onMessage: getState | saveSettings | setFocus |  │
+                 │            unlock | resetStats | proTest |      │
+                 │            coldTurkey | proSchedule | proRefresh│
                  └──────────────────────────────────────────────┘
                         ▲                        ▲
        chrome.storage   │                        │   chrome.storage.session
@@ -195,24 +268,35 @@ Tutte le pagine condividono `common.js`; applicano il tema con `applyTheme()` e 
 ai cambi di storage tramite `chrome.storage.onChanged` (così, per esempio, modificando un sito
 dalle impostazioni la dashboard si aggiorna da sola).
 
-### 5.2 Flusso di intercettazione
+### 5.2 Flusso di intercettazione (siti singoli + categorie)
 
 ```
 1. Utente naviga verso https://instagram.com (indirizzo digitato, link, redirect…)
 2. webNavigation.onBeforeNavigate (solo frameId === 0, schemi http/https)
-3. focusEnabled?  se no → lascia passare
-4. siteFor(url) → corrisponde a un sito configurato e attivo?  se no → lascia passare
-5. Controlli in ordine:
-   a. limite giornaliero superato?            → block.html?r=limit
-   b. scheda nel periodo di grazia?           → lascia passare
-   c. modalità "block"?                        → block.html?r=block
-   d. altrimenti                               → block.html?r=hold
-6. tabs.update(tabId, { url: block.html?u=<url originale>&r=<motivo> })
+3. resolveHit(url) → un'unica regola applicabile:
+   a. il SITO singolo configurato che contiene il dominio, se attivo o in cold
+      turkey (ha SEMPRE precedenza su un'eventuale categoria);
+   b. altrimenti la CATEGORIA attiva (o in cold turkey) che contiene il dominio.
+   Nessuna regola → lascia passare.
+4. Controlli in ordine di priorità:
+   0. cold turkey (PRO) attivo sul target?      → block.html?r=ct (vince su tutto,
+                                                   anche su Focus spento e grazia)
+   1. focusEnabled? se no                       → lascia passare
+   2. fascia oraria (PRO) configurata e NON
+      attiva adesso?                            → lascia passare
+   3. limite superato? (sito singolo, oppure
+      budget aggregato della categoria)         → block.html?r=limit[&c=<id categoria>]
+   4. scheda nel periodo di grazia?             → lascia passare
+   5. modalità "block"?                         → block.html?r=block
+   6. altrimenti                                → block.html?r=hold
+5. tabs.update(tabId, { url: block.html?u=<url originale>&r=<motivo>[&c=<id>] })
    e contatore "blocked" += 1
 ```
 
 Le URL `chrome-extension://`, `chrome://`, `about:` ecc. vengono ignorate (controllo di schema),
-quindi la pagina di blocco stessa e la dashboard non vengono mai re-intercettate.
+quindi la pagina di blocco stessa e la dashboard non vengono mai re-intercettate. Il parametro
+`c=<id>` accompagna `r=limit` per i blocchi di categoria: la pagina di blocco lo usa per
+mostrare il totale del budget aggregato già consumato.
 
 ### 5.3 Flusso "tieni premuto" (la feature portante)
 
@@ -276,15 +360,18 @@ dalle pagine (il background non ne ha bisogno).
 
 ### 5.6 Limite giornaliero
 
-Il limite è **approssimato a livello di navigazione**: si confronta il tempo accumulato
-(`stats.byDay[oggi][dominio]`) con `limitMinutes * 60` a ogni `onBeforeNavigate`. Superato
+Il limite è **approssimato a livello di navigazione**: a ogni `onBeforeNavigate` si confronta
+il tempo accumulato con `limitMinutes * 60`. Per i **singoli siti** il confronto usa
+`stats.byDay[oggi][dominio]`; per le **categorie** usa `categoryUsedSeconds()` — un **budget
+aggregato** che somma i secondi spesi su tutti i domini della categoria (vedi 2.7). Superato
 il limite, la navigazione viene bloccata con `r=limit` anche se la scheda è in periodo di
 grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tracciato.
 
 - **Blocco automatico a pagina aperta**: a ogni tick dell'alarm `enforceLimits()` controlla i
-  siti configurati con limite attivo; se il tempo accumulato supera il limite, le schede ancora
-  aperte sul sito vengono reindirizzate subito alla pagina di blocco (`r=limit`), senza
-  aspettare una nuova navigazione (al massimo un tick di ritardo).
+  siti singoli e le categorie attive con limite/budget superato; se il tempo accumulato supera
+  il limite, le schede ancora aperte sul sito vengono reindirizzate subito alla pagina di
+  blocco (`r=limit`, con `c=<id>` per le categorie), senza aspettare una nuova navigazione
+  (al massimo un tick di ritardo).
 
 ### 5.7 Temi
 
@@ -321,6 +408,31 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
 - `background.js` importa `i18n.js` solo per sanitizzare `settings.lang` (`sanitizeSettings`);
   il manifest usa `default_locale: "it"` e `__MSG_*__` per nome/descrizione in `_locales/`.
 
+### 5.9 Stato PRO e pagamenti (ExtensionPay)
+
+- **La UI legge solo la firma locale**: `isPro(settings)` controlla che
+  `settings._aT === "x8f9q"`. La firma fa sparire i lucchetti e mostra gli strumenti PRO,
+  ma **non concede nulla**: chi la falsifica nello storage non ottiene poteri.
+- **Le azioni critiche passano da `verifyProLive()`** nel background (`coldTurkey` e
+  `proSchedule` la invocano prima di scrivere):
+  1. il toggle di sviluppo `_devPro` (Info, da rimuovere prima della pubblicazione) approva;
+  2. altrimenti `ExtPay(EXT_PAY_ID).getUser()` interroga extensionpay.com: se `user.paid` è
+     true l'azione parte e la firma viene riallineata a `_aT = "x8f9q"`;
+  3. ogni "no" definitivo (non pagato, oppure ExtensionPay non configurato) **rimuove la
+     firma** (revoca della UI) e rifiuta l'operazione con `reason: "pro"`;
+  4. un errore di rete è **fail-closed**: l'operazione è rifiutata ma l'ultimo stato noto
+     della UI non viene toccato (un utente pagato non viene "sloggato" per un calo di rete).
+- **Allineamento automatico**: `refreshProStatus()` interroga ExtensionPay all'avvio del
+  service worker, all'installazione e all'avvio del browser, riallineando la firma UI allo
+  stato reale; la pagina impostazioni può richiederlo esplicitamente col messaggio
+  `proRefresh` (es. dopo il pagamento).
+- **Flusso di acquisto**: "Sblocca PRO (Lifetime)" → `extpay.openPaymentPage()`;
+  "Ho già pagato? Accedi" → `extpay.openLoginPage()`. Mentre la scheda di pagamento è
+  aperta la pagina impostazioni fa un polling breve di `getUser()`; appena risulta pagato
+  invia `proRefresh`, aggiorna la UI (lucchetti rimossi) e mostra il ringraziamento.
+- **Messaggi**: `proTest` (toggle di sviluppo), `proRefresh` (riallineamento richiesto),
+  `coldTurkey` e `proSchedule` (azioni critiche, sempre dietro `verifyProLive`).
+
 ---
 
 ## 6. Scelte tecniche e limiti noti
@@ -339,6 +451,19 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
 - **`hidden` CSS**: regola globale `[hidden] { display: none !important; }` in `common.css`
   e `block.css` per evitare che `display: flex` dei componenti annulli l'attributo `hidden`
   (bug reale trovato dal test e2e).
+- **ExtensionPay (pagamenti PRO)**: nessun server proprio; la libreria `ExtPay.js`
+  (vendored dal pacchetto npm `extpay` v3.1.2, **licenza AGPL-3.0**) comunica solo con
+  `extensionpay.com`. Chrome Web Store non offre acquisti in-app nativi, quindi l'acquisto
+  Lifetime avviene sulla pagina di pagamento ExtensionPay/Stripe. `EXT_PAY_ID` vuoto
+  (= non ancora registrati su extensionpay.com) disabilita ExtensionPay: in sviluppo le
+  funzioni PRO si testano col toggle in Info.
+- **Verifica PRO fail-closed**: un errore di rete non approva mai un'azione critica e non
+  tocca lo stato UI; un "non pagato" (o ExtensionPay assente) rimuove anche la firma
+  locale falsificata. Falsificare `chrome.storage.local` non sblocca nulla.
+- **Privacy**: la sola comunicazione esterna è la verifica dello stato di pagamento (nessun
+  contenuto personale). Scelta consapevole: NON si usa il content script su
+  `extensionpay.com` (che abiliterebbe i callback push `onPaid` ma aggiungerebbe un
+  permesso all'installazione); il post-pagamento è gestito con polling breve + `proRefresh`.
 
 ---
 
@@ -352,7 +477,7 @@ node e2e-test.js
   `~/.cache/minimalista-cft`) perché supporta `--load-extension` (rimosso da Chrome 137+ branded).
 - Lancia Chrome in una **piccola finestra visibile**: gli eventi mouse via CDP richiedono
   hit-testing reale (con la finestra fuori schermo i click non arrivano).
-- Verifica (36 controlli):
+- Verifica (64 controlli):
   1. caricamento dell'estensione e id registrato;
   2. pagina impostazioni con API estensione, righe dei siti e 7 temi;
   3. salvataggio impostazioni via messaggio (con sanitizzazione);
@@ -370,7 +495,18 @@ node e2e-test.js
   9. **temi custom**: creazione dall'editor con nome e tre colori, card nella griglia con
      tema selezionato ed editor aperto, eliminazione (il tema torna a Midnight);
  10. **tipografia**: il cambio di stile font (monospace) si applica subito nelle impostazioni
-     e anche nelle pagine già aperte (dashboard).
+     e anche nelle pagine già aperte (dashboard);
+ 11. **personalizzazione avanzata**: card "Avanzate" (URL sfondo + slider 0–24 + reset),
+     anteprima live del raggio (variabile CSS e card derivate), persistenza, propagazione
+     alla dashboard già aperta, sicurezza dell'URL (niente CSS injection) e sanitizzazione;
+ 12. **categorie**: 6 categorie renderizzate e sanitizzate, attivazione dall'interfaccia,
+     intercettazione di un dominio membro, **budget aggregato superato** → blocco
+     `r=limit&c=video`;
+ 13. **PRO**: strumenti bloccati senza abbonamento, UI di sblocco (bottone acquisto + login),
+     firma falsificata rifiutata e revocata, avviso in build senza `EXT_PAY_ID`, `proRefresh`
+     senza ExtensionPay, toggle di sviluppo, cold turkey dall'interfaccia (riga disabilitata
+     + chip ⛓, override del periodo di grazia con `r=ct`), fasce orarie dentro/fuori finestra.
+     (Il banner incognito non è coperto: non è simulabile in Chrome for Testing.)
 - Richiede Node ≥ 22 (fetch + WebSocket globali).
 - Se `CHROME_BIN` è impostato, usa quel binario invece di Chrome for Testing.
 
@@ -392,5 +528,6 @@ node e2e-test.js
 - Altre lingue (il sistema di dizionari in `i18n.js` rende l'aggiunta immediata).
 - Sincronizzazione impostazioni tra dispositivi (richiederebbe `chrome.storage.sync` e una
   scelta consapevole sulla privacy).
-- Blocco orario (es. niente Instagram dalle 9:00 alle 18:00).
+- Prova gratuita / trial dei piani PRO tramite ExtensionPay (`extpay.openTrialPage()`,
+  `user.trialStartedAt`); il gating live è già predisposto in `verifyProLive`.
 - Esportazione delle statistiche (CSV/JSON) per analisi più profonde.

@@ -7,7 +7,16 @@
 html { color-scheme: dark; }
 
 body {
-  background: var(--bg, #232326);
+  /* Sfondo a strati (dal basso): colore → gradiente del tema PRO (--bg-grad,
+     solo con i temi PRO) → immagine utente (--bg-img). Entrambe le variabili
+     arrivano da applyTheme; i layer "none" sono trasparenti, così basta
+     rimuovere la variabile per togliere lo strato. cover/center/fixed adattano
+     immagine e gradiente allo schermo senza deformarli. */
+  background-color: var(--bg, #232326);
+  background-image: var(--bg-img, none), var(--bg-grad, none);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-attachment: fixed, fixed;
   color: var(--fg, #f2f2f0);
   /* il font scelto in Aspetto → Tipografia arriva da --app-font (impostato da applyTheme su <html>);
      il fallback vale solo prima che il tema venga applicato */
@@ -25,7 +34,8 @@ h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.14em; colo
 .card {
   background: var(--card, #2e2e33);
   border: 1px solid var(--border, #3a3a41);
-  border-radius: 14px;
+  /* le card sono leggermente più arrotondate dei controlli interni */
+  border-radius: calc(var(--border-radius, 8px) + 6px);
   padding: 20px;
   margin-bottom: 18px;
 }
@@ -73,7 +83,7 @@ input:not([type]),
 select {
   background: var(--bg, #232326);
   border: 1px solid var(--border, #3a3a41);
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   color: var(--fg, #f2f2f0);
   font-family: inherit;
   font-size: 0.9rem;
@@ -97,7 +107,7 @@ button {
   background: var(--card, #2e2e33);
   border: 1px solid var(--border, #3a3a41);
   color: var(--fg, #f2f2f0);
-  border-radius: 8px;
+  border-radius: var(--border-radius, 8px);
   padding: 8px 14px;
   cursor: pointer;
 }

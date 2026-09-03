@@ -107,7 +107,9 @@ function bindStatic() {
     });
   });
 
-  // cambio lingua dall'esterno (es. un'altra scheda) → ri-render del tutto
+  // cambio lingua dall'esterno (es. un'altra scheda) → ri-render del tutto;
+  // cambio della sola firma PRO (pagamento arrivato, verifica fallita, revoca)
+  // → aggiorna solo lo stato dei lucchetti
   onStorageChange((changes) => {
     const s = changes.settings;
     if (!s || !s.newValue) return;
@@ -116,6 +118,9 @@ function bindStatic() {
       setUILang(settings.lang);
       applyI18n(document);
       renderAll();
+    } else if ((s.oldValue || {})[_PRO_SIG] !== s.newValue[_PRO_SIG]) {
+      settings = { ...JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), ...s.newValue, sites: s.newValue.sites || [] };
+      renderPro();
     }
   });
 }
@@ -132,13 +137,17 @@ function switchSection(sec) {
    ============================================================ */
 function renderAll() {
   renderSites();
+  renderCategories();
+  renderPro();
   renderGrace();
   renderTheme();
   renderTypography();
+  renderAdvanced();
   renderLang();
   renderSearchEngine();
   renderSearchToggle();
   renderPin();
+  renderDev();
   renderStats();
   el("focusToggle").checked = settings.focusEnabled;
 }
@@ -146,18 +155,26 @@ function renderAll() {
 function renderSites() {
   el("siteSuggestions").innerHTML = SUGGESTED_SITES.map(s => `<option value="${esc(s)}">`).join("");
   const rows = el("siteRows");
-  rows.innerHTML = settings.sites.map(s => `
-    <div class="site-row" data-id="${s.id}">
-      <label class="switch small"><input type="checkbox" class="site-active" ${s.active ? "checked" : ""} aria-label="${esc(t("active_aria"))}"><span class="slider"></span></label>
-      <span class="site-domain">${esc(s.domain)}</span>
-      <select class="site-mode" aria-label="${esc(t("mode_aria"))}">
+  const now = Date.now();
+  rows.innerHTML = settings.sites.map(s => {
+    const inCt = (s.ctUntil || 0) > now;
+    const chips =
+      (inCt ? `<span class="chip ct-chip" data-until="${s.ctUntil}">⛓ ${esc(ctRemainingLabel(s.ctUntil))}</span>` : "") +
+      (s.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(s.schedule))}">🕒</span>` : "");
+    const dis = inCt ? " disabled" : "";
+    return `
+    <div class="site-row ${inCt ? "ct-locked" : ""}" data-id="${s.id}">
+      <label class="switch small"><input type="checkbox" class="site-active" ${s.active ? "checked" : ""} aria-label="${esc(t("active_aria"))}"${dis}><span class="slider"></span></label>
+      <span class="site-domain">${esc(s.domain)}${chips}</span>
+      <select class="site-mode" aria-label="${esc(t("mode_aria"))}"${dis}>
         <option value="hold" ${s.mode === "hold" ? "selected" : ""}>${esc(t("mode_hold"))}</option>
         <option value="block" ${s.mode === "block" ? "selected" : ""}>${esc(t("mode_block"))}</option>
       </select>
-      <span class="delay-field">⏱ <input type="number" class="site-delay" min="1" max="30" value="${s.delay}" ${s.mode === "block" ? "disabled" : ""}> s</span>
-      <span class="limit-field">⏳ <input type="number" class="site-limit" min="0" max="1440" value="${s.limitMinutes}"> ${esc(t("limit_per_day_short"))}</span>
-      <button class="site-del-btn" title="${esc(t("remove_aria"))}" aria-label="${esc(t("remove_aria"))}">✕</button>
-    </div>`).join("");
+      <span class="delay-field">⏱ <input type="number" class="site-delay" min="1" max="30" value="${s.delay}" ${s.mode === "block" || inCt ? "disabled" : ""}> s</span>
+      <span class="limit-field">⏳ <input type="number" class="site-limit" min="0" max="1440" value="${s.limitMinutes}"${dis}> ${esc(t("limit_per_day_short"))}</span>
+      <button class="site-del-btn" title="${esc(t("remove_aria"))}" aria-label="${esc(t("remove_aria"))}"${dis}>✕</button>
+    </div>`;
+  }).join("");
 
   rows.querySelectorAll(".site-row").forEach(row => {
     const id = Number(row.dataset.id);
@@ -195,7 +212,7 @@ function renderGrace() {
 
 function save() {
   sendMessage({ type: "saveSettings", settings }).then(() => {
-    applyTheme(document.documentElement, settings);
+    applyCurrentTheme();
     updateThemeSelection();
     renderSites(); // riallinea i controlli dopo la sanitizzazione (es. delay clamp)
   });
@@ -244,6 +261,7 @@ function renderTheme() {
 
   grid.querySelectorAll(".theme-card[data-theme]").forEach(card => {
     card.addEventListener("click", async (e) => {
+      exitProPreview(); // scegliere un tema normale chiude l'eventuale anteprima PRO
       const id = card.dataset.theme;
       if (e.target.closest(".t-del")) {
         removeCustomTheme(id); // ✕ della card: elimina senza selezionare
@@ -253,21 +271,109 @@ function renderTheme() {
       save(); // updateThemeSelection apostera l'editor sul tema scelto
     });
   });
-  el("themeNewCard").addEventListener("click", () => openCustomEditor(null));
+  el("themeNewCard").addEventListener("click", () => {
+    exitProPreview();
+    openCustomEditor(null);
+  });
 
+  renderProThemes();
+  bindProPreviewBar();
   updateThemeSelection();
+}
+
+/* ---------------- temi PRO (gradienti) + anteprima per i non-PRO ------------- */
+let proPreviewThemeId = null; // tema PRO in anteprima (solo memoria, mai salvato)
+let previewBarBound = false;
+
+// Applica il tema corrente: se c'è un'anteprima PRO attiva la forza (anche per i
+// non-PRO), altrimenti il tema regolare di settings.
+function applyCurrentTheme() {
+  if (proPreviewThemeId) {
+    applyTheme(document.documentElement, { ...settings, theme: proPreviewThemeId }, true);
+  } else {
+    applyTheme(document.documentElement, settings);
+  }
+}
+
+function renderProThemes() {
+  const grid = el("proThemeGrid");
+  if (!grid) return;
+  grid.dataset.total = String(PRO_THEME_IDS.length); // esposizione per i test e2e
+  const unlocked = isPro(settings);
+  grid.innerHTML = PRO_THEME_IDS.map(id => {
+    const t = PRO_THEMES[id];
+    const prev = proPreviewThemeId === id;
+    const grad = `linear-gradient(160deg, ${t.grad[0]}, ${t.grad[1]})`;
+    return `
+      <div class="theme-card pro ${prev ? "previewing" : ""}" data-pro-theme="${id}">
+        ${unlocked ? `<span class="pro-badge">PRO</span>` : `<span class="t-lock">🔒</span>`}
+        <div class="t-grad" style="background:${grad}"></div>
+        <div class="t-name">${esc(t.label)}</div>
+      </div>`;
+  }).join("");
+  grid.querySelectorAll(".theme-card.pro").forEach(card => {
+    card.addEventListener("click", () => onProThemeClick(card.dataset.proTheme));
+  });
+}
+
+function onProThemeClick(id) {
+  if (isPro(settings)) {
+    // PRO: applica e salva (la sanitizzazione ammette il tema con la firma)
+    exitProPreview();
+    settings.theme = id;
+    save();
+    return;
+  }
+  // non-PRO: solo anteprima in memoria (mai persistita); un secondo click chiude
+  if (proPreviewThemeId === id) { exitProPreview(); return; }
+  proPreviewThemeId = id;
+  el("proPreviewName").textContent = PRO_THEMES[id].label;
+  el("proPreviewBar").hidden = false;
+  applyCurrentTheme();
+  updateThemeSelection();
+}
+
+function exitProPreview() {
+  if (!proPreviewThemeId) return;
+  proPreviewThemeId = null;
+  el("proPreviewBar").hidden = true;
+  applyCurrentTheme();
+  updateThemeSelection();
+}
+
+function bindProPreviewBar() {
+  if (previewBarBound) return;
+  previewBarBound = true;
+  el("proPreviewClose").addEventListener("click", exitProPreview);
+  el("proPreviewUnlock").addEventListener("click", () => {
+    // porta l'utente alla card di pagamento PRO (sezione Focus) e la evidenzia
+    switchSection("focus");
+    const card = el("proCard");
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("pro-pulse");
+      setTimeout(() => card.classList.remove("pro-pulse"), 1600);
+    }
+  });
 }
 
 /* ---------------- temi custom ------------- */
 let customEditingId = null; // id del tema in modifica; null = nuovo tema
 
-// Evidenzia il tema selezionato e apre l'editor quando è selezionato un tema
-// custom (così si possono rifinire i colori con precisione). Chiamato da save().
+// Evidenzia il tema selezionato (entrambe le griglie) e apre l'editor quando è
+// selezionato un tema custom. Durante un'anteprima PRO la selezione normale è
+// oscurata: evidenzia solo la card in anteprima. Chiamato da save().
 function updateThemeSelection() {
-  document.querySelectorAll("#themeGrid .theme-card").forEach(card => {
-    card.classList.toggle("selected", settings.theme === card.dataset.theme);
+  document.querySelectorAll("#themeGrid .theme-card, #proThemeGrid .theme-card").forEach(card => {
+    const isProCard = !!card.dataset.proTheme;
+    const id = isProCard ? card.dataset.proTheme : card.dataset.theme;
+    let active;
+    if (proPreviewThemeId) active = isProCard && id === proPreviewThemeId;
+    else active = id === settings.theme;
+    card.classList.toggle("selected", !!active);
+    if (isProCard) card.classList.toggle("previewing", !!active && !!proPreviewThemeId);
   });
-  const ct = findCustomTheme(settings);
+  const ct = proPreviewThemeId ? null : findCustomTheme(settings);
   if (ct) openCustomEditor(ct);
   else closeCustomEditor();
 }
@@ -368,6 +474,44 @@ function renderTypography() {
   fs.addEventListener("change", () => save());
   el("fontFamily").addEventListener("change", (e) => { settings.fontFamily = e.target.value; save(); });
   el("showSeconds").addEventListener("change", (e) => { settings.showSeconds = e.target.checked; save(); });
+}
+
+/* ============================================================
+   PERSONALIZZAZIONE AVANZATA (sfondo + arrotondamento)
+   ============================================================ */
+let advancedBound = false;
+function renderAdvanced() {
+  el("bgImage").value = settings.bgImage || "";
+  const r = el("borderRadius");
+  r.value = settings.borderRadius ?? 8;
+  el("borderRadiusVal").textContent = r.value + "px";
+
+  if (advancedBound) return;
+  advancedBound = true;
+
+  // URL immagine di sfondo: anteprima live durante la digitazione,
+  // salvataggio definitivo al blur (change).
+  el("bgImage").addEventListener("input", (e) => {
+    settings.bgImage = e.target.value;
+    applyTheme(document.documentElement, settings);
+  });
+  el("bgImage").addEventListener("change", () => save());
+
+  // slider arrotondamento: input → anteprima live, change → salvataggio.
+  el("borderRadius").addEventListener("input", (e) => {
+    settings.borderRadius = Number(e.target.value);
+    el("borderRadiusVal").textContent = e.target.value + "px";
+    applyTheme(document.documentElement, settings);
+  });
+  el("borderRadius").addEventListener("change", () => save());
+
+  // reset al valore di default (8px)
+  el("borderRadiusReset").addEventListener("click", () => {
+    settings.borderRadius = 8;
+    el("borderRadius").value = 8;
+    el("borderRadiusVal").textContent = "8px";
+    save();
+  });
 }
 
 /* ============================================================
@@ -563,5 +707,480 @@ async function renderStats() {
   }
 
 }
+
+/* ============================================================
+   CATEGORIE DI SITI (per tutti i piani)
+   ============================================================ */
+// Stato UI delle righe categoria (riga aperta, modalità modifica, messaggio):
+// solo vista, non viene persistito.
+const catUi = {};
+function catUiState(id) {
+  return catUi[id] || (catUi[id] = { open: false, edit: false, msg: "", ok: false });
+}
+
+// Salva la lista personalizzata dei domini di una categoria (PRO). La verifica
+// live avviene nel background: se l'utente non è PRO il salvataggio viene
+// rifiutato e la firma UI (se falsificata) rimossa.
+async function applyCatDomains(id, domains) {
+  const resp = await sendMessage({ type: "proSaveCategories", id, domains });
+  settings = await getSettings();
+  const ui = catUiState(id);
+  ui.edit = false;
+  if (resp && resp.ok) {
+    ui.msg = t("cat_saved_ok");
+    ui.ok = true;
+  } else if (resp && resp.reason === "pro") {
+    ui.msg = t("pro_denied");
+    ui.ok = false;
+  } else {
+    ui.msg = t("pro_action_failed");
+    ui.ok = false;
+  }
+  renderCategories();
+  renderPro();
+  setTimeout(() => {
+    const m = document.querySelector(`.cat-row[data-cat="${id}"] .cat-msg`);
+    if (m) m.textContent = "";
+  }, 4000);
+}
+
+function renderCategories() {
+  const rows = el("catRows");
+  const now = Date.now();
+  const locked = !isPro(settings);
+  rows.innerHTML = CATEGORIES.map(reg => {
+    const conf = categoryConf(settings, reg.id);
+    const ui = catUiState(reg.id);
+    const inCt = (conf.ctUntil || 0) > now;
+    const dis = inCt ? " disabled" : "";
+    const name = esc(t(reg.labelKey));
+    const doms = categoryDomains(settings, reg.id);
+    const chips =
+      (inCt ? `<span class="chip ct-chip" data-until="${conf.ctUntil}">⛓ ${esc(ctRemainingLabel(conf.ctUntil))}</span>` : "") +
+      (conf.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(conf.schedule))}">🕒</span>` : "");
+    const list = ui.open ? `
+      <div class="cat-domain-list">
+        <div class="cat-domain-chips">
+          ${doms.length
+            ? doms.map(d => `<span class="chip">${esc(d)}${ui.edit && !inCt && !locked
+                ? `<button type="button" class="cat-del-dom" data-dom="${esc(d)}" title="${esc(t("cat_del_title"))}" aria-label="${esc(t("cat_del_title"))}">✕</button>`
+                : ""}</span>`).join("")
+            : `<span class="hint">${esc(t("cat_no_domains"))}</span>`}
+        </div>
+        <div class="cat-edit-row">
+          ${ui.edit && !inCt && !locked ? `
+            <input type="text" class="cat-dom-input" placeholder="${esc(t("cat_add_ph"))}" autocomplete="off" spellcheck="false" aria-label="${esc(t("cat_add_ph"))}">
+            <button type="button" class="primary cat-dom-add" data-i18n="cat_add">${esc(t("cat_add"))}</button>
+            <button type="button" class="cat-edit-done" data-i18n="cat_done">${esc(t("cat_done"))}</button>`
+          : (inCt || locked)
+            ? `<button type="button" class="cat-pro-note" data-edit-gate>🔒 PRO · ${esc(t("cat_edit"))}</button>`
+            : `<button type="button" class="cat-edit-toggle" data-edit-start>✎ ${esc(t("cat_edit"))}</button>`}
+        </div>
+        <p class="cat-msg ${ui.ok ? "ok" : ui.msg ? "err" : ""}">${esc(ui.msg || "")}</p>
+      </div>` : "";
+    return `
+    <div class="cat-row ${ui.open ? "open" : ""} ${inCt ? "ct-locked" : ""}" data-cat="${reg.id}">
+      <label class="switch small"><input type="checkbox" class="cat-active" ${conf.active ? "checked" : ""} aria-label="${name}"${dis}><span class="slider"></span></label>
+      <div class="cat-head" title="${esc(t("cat_view_title"))}">
+        <span class="cat-chevron">▶</span>
+        <span class="cat-name" title="${esc(doms.join(" · "))}">${name} <span class="chip">${doms.length}</span>${chips}</span>
+      </div>
+      <select class="cat-mode" aria-label="${name}"${dis}>
+        <option value="hold" ${conf.mode === "hold" ? "selected" : ""}>${esc(t("mode_hold"))}</option>
+        <option value="block" ${conf.mode === "block" ? "selected" : ""}>${esc(t("mode_block"))}</option>
+      </select>
+      <span class="delay-field">⏱ <input type="number" class="cat-delay" min="1" max="30" value="${conf.delay}" ${conf.mode === "block" || inCt ? "disabled" : ""}> s</span>
+      <span class="limit-field">⏳ <input type="number" class="cat-limit" min="0" max="1440" value="${conf.limitMinutes}"${dis}> ${esc(t("limit_per_day_short"))}</span>
+      ${list}
+    </div>`;
+  }).join("");
+
+  rows.querySelectorAll(".cat-row").forEach(row => {
+    const id = row.dataset.cat;
+    const conf = settings.categories.find(c => c.id === id);
+    if (!conf) return;
+    row.querySelector(".cat-active").addEventListener("change", (e) => {
+      conf.active = e.target.checked;
+      save();
+      checkIncognitoBanner();
+    });
+    row.querySelector(".cat-mode").addEventListener("change", (e) => {
+      conf.mode = e.target.value;
+      row.querySelector(".cat-delay").disabled = conf.mode === "block";
+      save();
+    });
+    row.querySelector(".cat-delay").addEventListener("change", (e) => {
+      conf.delay = Math.min(30, Math.max(1, Number(e.target.value) || 5));
+      e.target.value = conf.delay;
+      save();
+    });
+    row.querySelector(".cat-limit").addEventListener("change", (e) => {
+      conf.limitMinutes = Math.max(0, Number(e.target.value) || 0);
+      e.target.value = conf.limitMinutes;
+      save();
+    });
+    // espandi/comprimi la lista dei domini della categoria
+    const head = row.querySelector(".cat-head");
+    if (head) head.addEventListener("click", () => {
+      catUiState(id).open = !catUiState(id).open;
+      renderCategories();
+    });
+    // modifica dei domini (PRO): entra/esci dalla modalità, aggiungi, rimuovi
+    const startEdit = row.querySelector("[data-edit-start]");
+    if (startEdit) startEdit.addEventListener("click", () => {
+      catUiState(id).edit = true;
+      renderCategories();
+      const inp = document.querySelector(`.cat-row[data-cat="${id}"] .cat-dom-input`);
+      if (inp) inp.focus();
+    });
+    const gate = row.querySelector("[data-edit-gate]");
+    if (gate) gate.addEventListener("click", () => {
+      const ui = catUiState(id);
+      ui.msg = t("cat_edit_pro");
+      ui.ok = false;
+      const m = row.querySelector(".cat-msg");
+      if (m) { m.textContent = ui.msg; m.classList.add("err"); }
+    });
+    const done = row.querySelector(".cat-edit-done");
+    if (done) done.addEventListener("click", () => {
+      catUiState(id).edit = false;
+      renderCategories();
+    });
+    const addBtn = row.querySelector(".cat-dom-add");
+    const input = row.querySelector(".cat-dom-input");
+    if (addBtn && input) {
+      const add = () => {
+        const d = normalizeDomain(input.value);
+        input.value = "";
+        if (!d) return;
+        const doms = categoryDomains(settings, id);
+        if (doms.includes(d)) {
+          const ui = catUiState(id);
+          ui.msg = t("cat_dup");
+          ui.ok = false;
+          renderCategories();
+          return;
+        }
+        applyCatDomains(id, [...doms, d]);
+      };
+      addBtn.addEventListener("click", add);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+    }
+    row.querySelectorAll(".cat-del-dom").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const d = btn.dataset.dom;
+        applyCatDomains(id, categoryDomains(settings, id).filter(x => x !== d));
+      });
+    });
+  });
+  checkIncognitoBanner();
+}
+
+// Avviso incognito: le estensioni non sono attive in incognito di default.
+let incogBound = false;
+async function checkIncognitoBanner() {
+  const banner = el("incogBanner");
+  const adultiActive = (settings.categories || []).some(c => c.id === "adulti" && c.active);
+  if (!adultiActive) { banner.hidden = true; return; }
+  if (!incogBound) {
+    incogBound = true;
+    el("incogOpen").addEventListener("click", async () => {
+      try {
+        await chrome.tabs.create({ url: "chrome://extensions/?id=" + chrome.runtime.id });
+      } catch {
+        el("incogOpen").textContent = "chrome://extensions/?id=" + chrome.runtime.id;
+      }
+    });
+  }
+  try {
+    const allowed = await chrome.extension.isAllowedIncognitoAccess();
+    banner.hidden = allowed !== false;
+  } catch {
+    banner.hidden = true; // API non disponibile: niente banner
+  }
+}
+
+/* ============================================================
+   FUNZIONI PRO (Cold Turkey + fasce orarie)
+   ============================================================ */
+let proBound = false;
+function renderPro() {
+  const unlocked = isPro(settings);
+  el("proLocked").hidden = unlocked;
+  el("proTools").hidden = !unlocked;
+  if (!proBound) {
+    proBound = true;
+    el("ctStart").addEventListener("click", onCtStart);
+    el("schedSave").addEventListener("click", onSchedSave);
+    el("schedTarget").addEventListener("change", renderSchedEditor);
+    el("schedList").addEventListener("click", onSchedDel);
+    el("proUnlock").addEventListener("click", onProUnlock);
+    el("proLogin").addEventListener("click", onProLogin);
+  }
+  if (unlocked) {
+    fillTargetSelect(el("ctTarget"));
+    fillTargetSelect(el("schedTarget"));
+    renderCtActive();
+    renderSchedEditor();
+    renderSchedList();
+  }
+  renderProThemes(); // aggiorna i lucchetti delle card tema PRO allo stato attuale
+}
+
+function splitTarget(v) {
+  const i = String(v || "").indexOf(":");
+  return [v.slice(0, i), v.slice(i + 1)];
+}
+
+function findTarget(key) {
+  const [kind, id] = splitTarget(key);
+  if (kind === "site") {
+    const s = settings.sites.find(x => String(x.id) === id);
+    return s ? { kind, id, label: s.domain, ct: s.ctUntil || 0, sched: s.schedule || null } : null;
+  }
+  const reg = CATEGORIES.find(c => c.id === id);
+  if (!reg) return null;
+  const conf = categoryConf(settings, id);
+  return { kind, id, label: t(reg.labelKey), ct: conf.ctUntil || 0, sched: conf.schedule || null };
+}
+
+function fillTargetSelect(sel) {
+  const prev = sel.value;
+  const opts = [];
+  for (const s of settings.sites) opts.push({ v: "site:" + s.id, l: esc(s.domain) });
+  for (const reg of CATEGORIES) opts.push({ v: "cat:" + reg.id, l: esc(t(reg.labelKey)) + " (" + esc(t("cat_word")) + ")" });
+  sel.innerHTML = opts.map(o => `<option value="${o.v}">${o.l}</option>`).join("");
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+function renderCtActive() {
+  const now = Date.now();
+  const items = [];
+  for (const s of settings.sites) if ((s.ctUntil || 0) > now) items.push({ label: s.domain, until: s.ctUntil });
+  for (const reg of CATEGORIES) {
+    const conf = categoryConf(settings, reg.id);
+    if ((conf.ctUntil || 0) > now) items.push({ label: t(reg.labelKey), until: conf.ctUntil });
+  }
+  el("ctActive").innerHTML = items.length
+    ? items.map(it =>
+      `<div class="pro-item"><span class="pro-label">⛓ ${esc(it.label)}</span>` +
+      `<span class="chip ct-chip" data-until="${it.until}">⛓ ${esc(ctRemainingLabel(it.until))}</span></div>`).join("")
+    : `<div class="empty">${esc(t("ct_empty"))}</div>`;
+}
+
+async function onCtStart() {
+  const sel = el("ctTarget").value;
+  const hours = Number(el("ctHours").value) || 0;
+  const days = Number(el("ctDays").value) || 0;
+  el("ctMsg").textContent = "";
+  if (!sel) return;
+  if (hours <= 0 && days <= 0) { el("ctMsg").textContent = t("ct_invalid"); return; }
+  const [kind, id] = splitTarget(sel);
+  const resp = await sendMessage({ type: "coldTurkey", kind, id, hours, days });
+  await applyProResponse(resp, "ctMsg");
+}
+
+async function applyProResponse(resp, msgId) {
+  settings = await getSettings(); // rilegge ciò che il background ha davvero salvato
+  renderSites();
+  renderCategories();
+  renderPro();
+  if (resp && resp.ok) { el(msgId).textContent = ""; return; }
+  if (resp && resp.reason === "pro") { el("proMsg").textContent = t("pro_denied"); return; }
+  el(msgId).textContent = t("pro_action_failed");
+}
+
+/* ---------------- fasce orarie ---------------- */
+const _MON = new Date(2024, 0, 1); // lunedì
+function weekdayNames() {
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(_MON);
+    d.setDate(_MON.getDate() + i);
+    out.push(d.toLocaleDateString(localeTag(), { weekday: "short" }));
+  }
+  return out;
+}
+function minToHHMM(m) {
+  return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+}
+function hhmmToMin(v) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || ""));
+  return m ? (+m[1]) * 60 + (+m[2]) : NaN;
+}
+function scheduleLabel(sched) {
+  if (!sched) return "";
+  const wd = weekdayNames();
+  const days = sched.days.map(d => wd[d - 1]);
+  const dLabel = sched.days.length === 7 ? wd[0] + "–" + wd[6] : days.join(", ");
+  return dLabel + " " + minToHHMM(sched.start) + "–" + minToHHMM(sched.end);
+}
+
+function renderSchedEditor() {
+  const wrap = el("schedDays");
+  const wd = weekdayNames();
+  wrap.innerHTML = wd.map((name, i) =>
+    `<button type="button" class="day-chip" data-d="${i + 1}">${esc(name)}</button>`).join("");
+  wrap.querySelectorAll(".day-chip").forEach(ch =>
+    ch.addEventListener("click", () => ch.classList.toggle("on")));
+  const target = findTarget(el("schedTarget").value);
+  const sched = target ? target.sched : null;
+  wrap.querySelectorAll(".day-chip").forEach(ch =>
+    ch.classList.toggle("on", !!(sched && sched.days.includes(Number(ch.dataset.d)))));
+  el("schedStart").value = sched ? minToHHMM(sched.start) : "09:00";
+  el("schedEnd").value = sched ? minToHHMM(sched.end) : "18:00";
+}
+
+async function onSchedSave() {
+  const sel = el("schedTarget").value;
+  el("schedMsg").textContent = "";
+  if (!sel) return;
+  const days = [...document.querySelectorAll("#schedDays .day-chip.on")].map(ch => Number(ch.dataset.d));
+  const start = hhmmToMin(el("schedStart").value);
+  const end = hhmmToMin(el("schedEnd").value);
+  if (!days.length || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    el("schedMsg").textContent = t("sched_invalid");
+    return;
+  }
+  const [kind, id] = splitTarget(sel);
+  const resp = await sendMessage({ type: "proSchedule", kind, id, schedule: { days, start, end } });
+  await applyProResponse(resp, "schedMsg");
+}
+
+function renderSchedList() {
+  const items = [];
+  for (const s of settings.sites) if (s.schedule) items.push({ kind: "site", id: s.id, label: s.domain, sched: s.schedule });
+  for (const reg of CATEGORIES) {
+    const conf = categoryConf(settings, reg.id);
+    if (conf.schedule) items.push({ kind: "cat", id: reg.id, label: t(reg.labelKey), sched: conf.schedule });
+  }
+  el("schedList").innerHTML = items.length
+    ? items.map(it =>
+      `<div class="pro-item"><span class="pro-label">🕒 ${esc(it.label)}</span>` +
+      `<span class="hint">${esc(scheduleLabel(it.sched))}</span>` +
+      `<button type="button" class="pro-del" data-kind="${it.kind}" data-id="${it.id}" title="${esc(t("sched_remove"))}">✕</button></div>`).join("")
+    : `<div class="empty">${esc(t("sched_empty"))}</div>`;
+}
+
+async function onSchedDel(e) {
+  const btn = e.target.closest(".pro-del");
+  if (!btn) return;
+  const resp = await sendMessage({ type: "proSchedule", kind: btn.dataset.kind, id: btn.dataset.id, schedule: null });
+  await applyProResponse(resp, "schedMsg");
+}
+
+/* ---------------- toggle PRO di sviluppo (sezione Info) ---------------- */
+let devBound = false;
+async function renderDev() {
+  if (!el("proTestToggle")) return;
+  try {
+    const d = await chrome.storage.local.get("_devPro");
+    el("proTestToggle").checked = d._devPro === true;
+  } catch { /* ignora */ }
+  if (devBound) return;
+  devBound = true;
+  el("proTestToggle").addEventListener("change", async (e) => {
+    const on = e.target.checked;
+    await chrome.storage.local.set({ _devPro: on });
+    await sendMessage({ type: "proTest", on });
+    settings = await getSettings();
+    renderPro();
+  });
+}
+
+/* ---------------- sblocco PRO via ExtensionPay (sezione 7) ---------------- */
+let extpayUI = null;
+let proThanksTimer = null;
+function uiExtPay() {
+  if (!extpayUI && extpayConfigured()) extpayUI = ExtPay(EXT_PAY_ID);
+  return extpayUI;
+}
+
+function proThanks(text) {
+  const th = el("proThanks");
+  th.textContent = text;
+  th.hidden = false;
+  clearTimeout(proThanksTimer || 0);
+  proThanksTimer = setTimeout(() => { th.hidden = true; }, 8000);
+}
+
+async function onProUnlock() {
+  el("proMsg").textContent = "";
+  const ep = uiExtPay();
+  if (!ep) {
+    el("proMsg").textContent = t("pro_not_configured"); // build di sviluppo: serve il toggle in Info
+    return;
+  }
+  try {
+    await ep.openPaymentPage();
+    pollPaidStatus();
+  } catch {
+    el("proMsg").textContent = t("pro_pay_error");
+  }
+}
+
+async function onProLogin() {
+  el("proMsg").textContent = "";
+  const ep = uiExtPay();
+  if (!ep) {
+    el("proMsg").textContent = t("pro_not_configured");
+    return;
+  }
+  try {
+    await ep.openLoginPage(); // chi ha già pagato può riattivare su questo browser
+    pollPaidStatus();
+  } catch {
+    el("proMsg").textContent = t("pro_pay_error");
+  }
+}
+
+// Mentre l'utente completa il pagamento in un'altra scheda, interroga lo stato
+// ogni 4 s (max ~5 minuti); appena risulta pagato, chiede al background di
+// riallineare la firma UI: i lucchetti spariscono all'istante. Nessun contenuto
+// personale viene inviato: è solo la verifica dello stato di pagamento.
+async function pollPaidStatus() {
+  const ep = uiExtPay();
+  if (!ep || isPro(settings)) return;
+  for (let i = 0; i < 75; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+    let paid = false;
+    try { const user = await ep.getUser(); paid = !!(user && user.paid); } catch { /* rete: riprova */ }
+    if (paid) {
+      const resp = await sendMessage({ type: "proRefresh" });
+      settings = await getSettings();
+      renderPro();
+      if (resp && resp.paid) proThanks(t("pro_thanks"));
+      return;
+    }
+  }
+}
+
+/* ---------------- countdown dei blocchi ferrei ---------------- */
+function ctRemainingLabel(until) {
+  const ms = (until || 0) - Date.now();
+  if (ms <= 0) return "";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.max(1, Math.floor((ms % 3600000) / 60000));
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
+// un tick al secondo: aggiorna i countdown e, quando un blocco scade, sblocca le righe
+setInterval(() => {
+  if (!settings) return;
+  const now = Date.now();
+  let expired = false;
+  for (const o of [...(settings.sites || []), ...(settings.categories || [])]) {
+    if ((o.ctUntil || 0) > 0 && o.ctUntil <= now) expired = true;
+  }
+  document.querySelectorAll(".ct-chip").forEach(ch => {
+    const u = Number(ch.dataset.until || 0);
+    if (u > now) ch.textContent = "⛓ " + ctRemainingLabel(u);
+  });
+  if (expired) {
+    renderSites();
+    renderCategories();
+    renderPro();
+  }
+}, 1000);
 
 init();

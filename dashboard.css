@@ -4,7 +4,9 @@ body {
   display: flex;
   justify-content: center;
   padding: 40px 16px 60px;
-  background: var(--bg);
+  /* solo colore: l'eventuale immagine (--bg-img) e il suo cover/center/fixed
+     arrivano dalla regola body di common.css */
+  background-color: var(--bg);
 }
 
 .phone {
@@ -92,7 +94,7 @@ button.ghost:hover { color: var(--accent); }
   flex: 1;
   min-width: 0;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: calc(var(--border-radius, 8px) + 2px);
   font-size: 0.95rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -105,7 +107,7 @@ button.ghost:hover { color: var(--accent); }
 
 #searchForm button,
 #todoAdd button {
-  border-radius: 10px;
+  border-radius: calc(var(--border-radius, 8px) + 2px);
 }
 #searchForm button {
   padding: 0 16px;
@@ -166,7 +168,7 @@ dialog {
   background: var(--card);
   color: var(--fg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: calc(var(--border-radius, 8px) + 6px);
   padding: 24px;
   width: min(360px, calc(100vw - 40px));
 }

@@ -10,6 +10,11 @@
 > (sincronizzazione cloud, report via email, intelligenza artificiale). Dove serve,
 > è indicato con `☁ richiede server`. Tutto il resto resta 100% su dispositivo,
 > in linea con la filosofia privacy dell'app.
+>
+> **Stato implementazione (v1.0.0):** le idee marcate **✅** sono già implementate
+> nell'estensione (vedi `ARCHITETTURA.md`). Le funzioni PRO sono sbloccate con un
+> acquisto **Lifetime** gestito da **ExtensionPay**; il resto del documento resta una
+> raccolta di idee per il futuro.
 
 ---
 
@@ -19,8 +24,9 @@
   Tokyo Night, Forest, Nord…) aggiornata periodicamente, con anteprime animate.
 - **Temi sfumati**: palette con gradienti (2–3 colori) per sfondo e accenti, con slider
   dedicati e calcolo automatico del testo a contrasto.
-- **Personalizzazione dello sfondo**: immagine/colore dell'utente in dashboard e popup,
-  con overlay di opacità per mantenere la leggibilità; tema "wallpaper adattivo" che
+- **Personalizzazione dello sfondo**: ✅ l'immagine di sfondo dell'utente (URL) è già
+  disponibile per tutti in Aspetto → Avanzate (con arrotondamento dei bordi regolabile).
+  Restano idee Pro: overlay di opacità per la leggibilità e tema "wallpaper adattivo" che
   estrae i colori dall'immagine.
 - **Font personalizzati**: caricare i propri font (TTF/OTF, salvati localmente) oltre
   ai 4 stili base; regolazione fine di spaziatura e altezza riga.
@@ -48,10 +54,12 @@
 
 ## 3. Controllo del tempo avanzato
 
-- **Blocco orario**: finestre in cui un sito è bloccato del tutto (es. niente
-  Instagram 9:00–18:00) o, all'inverso, ore consentite ("solo dalle 20:00").
-- **Categorie di siti**: etichette (Social, Video, News, Giochi…) con **budget
-  aggregato** ("massimo 45 min/giorno su tutti i social messi insieme").
+- **Blocco orario**: ✅ implementato come **fasce orarie settimanali** (funzione PRO):
+  finestre con giorni + orario (es. niente Instagram lun–ven 9:00–18:00); fuori fascia
+  nessun blocco. Idea aperta: ore consentite inverse ("solo dalle 20:00").
+- **Categorie di siti**: ✅ implementate per tutti i piani (Social, Video, News, Adulti,
+  Giochi, Shopping) con **budget aggregato** ("max 45 min/giorno su tutti i social messi
+  insieme"): ogni categoria ha toggle, modalità, ritardo e limite di categoria.
 - **Budget settimanale/mensile**: il limite giornaliero diventa anche settimanale o
   mensile (es. 3 ore/settimana su YouTube, da spalmare come si vuole).
 - **Pausa programmata ricorrente**: sospensione automatica del Focus in fasce
@@ -60,9 +68,9 @@
   `/shorts` ma non il resto di YouTube) e parole chiave nel titolo/URL.
 - **Sottodomini separati**: `www.youtube.com` e `music.youtube.com` trattati come siti
   distinti, con limiti propri.
-- **Blocco "cold turkey"** 🔥: per i momenti più difficili — bloccare un sito per X
-  giorni **senza possibilità di override** (nemmeno dal PIN); la scelta è irreversibile
-  fino alla scadenza.
+- **Blocco "cold turkey"** 🔥: ✅ implementato come funzione PRO — bloccare un sito o
+  un'intera categoria per X ore/giorni **senza possibilità di override** (nemmeno dal PIN);
+  la scelta è irreversibile fino alla scadenza.
 
 ## 4. Motivazione e sfide
 
@@ -131,8 +139,9 @@
 |---|---|---|
 | Temi Pro, font, layout, preset | `chrome.storage.local` | nessuno |
 | Cronologia illimitata, export CSV/JSON | `chrome.storage.local` + download | `downloads` |
-| Blocco orario, categorie, budget, pattern URL | `background.js` | nessuno (già `webNavigation`) |
-| Pomodoro, suoni locali, cold turkey | `background.js` + `alarms` | nessuno (già `alarms`) |
+| Blocco orario ✅, categorie ✅, budget, pattern URL | `background.js` | nessuno (già `webNavigation`) |
+| Pomodoro, suoni locali, cold turkey ✅ | `background.js` + `alarms` | nessuno (già `alarms`) |
+| Verifica/acquisto PRO (ExtensionPay) | `background.js` + `options` + `ExtPay.js` | `storage` (già presente) + rete verso extensionpay.com |
 | Report via email, sync cloud, famiglia, IA | **backend esterno** | dominio/API esterno, crittografia |
 | Notifiche | `chrome.notifications` | nuovo permesso |
 
@@ -140,8 +149,9 @@ Linee guida da tenere a mente:
 - mantenere la versione gratuita **completa**: Pro deve aggiungere, non togliere;
 - ogni funzione ☁ deve avere un **equivalente locale** o un'opzione "solo dispositivo";
 - il cloud va progettato **end-to-end encrypted** per non tradire la filosofia privacy;
-- Chrome Web Store non offre acquisti in-app nativi: i pagamenti andranno gestiti con
-  **licenze/verifica esterna** (es. Stripe/PayPal + license server) o store esterno.
+- Chrome Web Store non offre acquisti in-app nativi: ✅ i pagamenti PRO sono gestiti con
+  **ExtensionPay** (licenza/verifica esterna su extensionpay.com, già integrata — vedi
+  `ARCHITETTURA.md` §5.9).
 
 ## 10. Modelli di prezzo possibili
 
@@ -156,6 +166,8 @@ Linee guida da tenere a mente:
 
 ---
 
-*Documento di visione — nessuna di queste funzioni è ancora implementata né promessa:
-serve a raccogliere idee per la futura versione Pro. Priorità suggerita: sezione 3
-(controllo del tempo) e 2 (statistiche), poi 1 e 4, infine quelle ☁.*
+*Documento di visione — raccoglie idee per la versione Pro. Le idee marcate **✅** sono
+ora implementate (categorie per tutti, cold turkey e fasce orarie come funzioni PRO con
+acquisto Lifetime via ExtensionPay); le altre non sono ancora implementate né promesse.
+Priorità suggerita per il futuro: sezione 3 (controllo del tempo) e 2 (statistiche), poi
+1 e 4, infine quelle ☁.*

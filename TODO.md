@@ -1,94 +1,261 @@
-# TODO per Agente AI: Personalizzazione Avanzata
+# TODO Minimalista — stato di avanzamento
 
-Questo documento descrive le istruzioni per implementare la "Personalizzazione Avanzata" (Immagine di Sfondo e Arrotondamento Bordi) all'interno dell'estensione Minimalista.
+> Documento di lavoro: ogni sezione riporta le istruzioni originali (in sintesi) e
+> **cosa è stato effettivamente implementato** (✅), con le differenze rispetto allo
+> spec. Il riferimento architetturale aggiornato è `ARCHITETTURA.md`.
 
-**Obiettivo:**
-Aggiungere la possibilità di impostare un'immagine di sfondo tramite URL e di regolare dinamicamente l'arrotondamento dei bordi dell'interfaccia, includendo un pulsante per il reset ai valori di default.
+## Riepilogo
 
-## 1. Modifiche ai Modelli Dati e Storage (`common.js`)
-- Aggiungi `bgImage: ""` e `borderRadius: 8` (oppure il valore che si intende usare di base) all'oggetto `DEFAULT_SETTINGS`.
-- Nella funzione `sanitizeSettings`, aggiungi la logica per validare i nuovi campi:
-  - `bgImage` deve essere una stringa (eventualmente fare `.trim()`).
-  - `borderRadius` deve essere un numero compreso in un range (es. 0 - 24). Prevedi un fallback a `8` se il dato è mancante o invalido.
-- Nella funzione `applyTheme`, inietta le nuove variabili CSS in `root.style`:
-  - Se `bgImage` è presente, setta `--bg-img: url("...")` (attenzione ad escapare eventuali doppi apici nell'URL), altrimenti rimuovi la proprietà.
-  - Setta `--border-radius: Xpx` usando il valore di `settings.borderRadius`.
+| Sezione | Stato | Verifiche e2e |
+|---|---|---|
+| 1–5. Personalizzazione avanzata (immagine di sfondo + arrotondamento bordi) | ✅ implementato | sezione 11 |
+| 6A. Categorie di siti (per tutti i piani) | ✅ implementato | sezione 12 |
+| 6B. Funzioni PRO (Cold Turkey + fasce orarie) | ✅ implementato | sezione 12 |
+| 6C. Banner modalità incognito (categoria Adulti) | ✅ implementato (non coperto da e2e) | — |
+| 7. Pagamenti PRO (ExtensionPay) | ✅ integrato — manca la registrazione dell'ID su extensionpay.com | sezione 12 (parziale) |
+| 8. Elenco e modifica dei siti delle categorie | ✅ implementato (elenco per tutti, modifica PRO) | sezione 12 |
+| 9. Card PRO premium (design) | ✅ implementato | sezione 12 (parziale) |
+| 10. Temi PRO con gradienti + anteprima gratuita | ✅ implementato (anteprima per tutti, persistenza PRO) | sezione 12 |
 
-## 2. Modifiche agli Stili Globali (`common.css` e `dashboard.css`)
-- In `common.css`, aggiorna la regola per `body`:
-  - Mantenendo `background-color` (oppure `background`), aggiungi `background-image: var(--bg-img, none)`.
-  - Aggiungi regole complementari come `background-size: cover`, `background-position: center`, `background-attachment: fixed` per adattare lo sfondo.
-- In `common.css` e `dashboard.css`, sostituisci i valori fissi di `border-radius` (es. `8px`, `10px`, `14px`) con `var(--border-radius, 8px)`.
-  - *Nota*: Per mantenere le proporzioni (ad esempio, le card potrebbero dover essere leggermente più arrotondate degli input), puoi usare `calc()` come: `border-radius: calc(var(--border-radius, 8px) + 6px)` per le `.card` e `dialog`.
+Suite e2e: **72/72 controlli** (`node e2e-test.js`).
 
-## 3. Modifiche all'Interfaccia Impostazioni (`options.html`)
-- Trova la sezione "Aspetto" e crea una nuova card o aggiungi alla fine della sezione esistente un'area intitolata "Avanzate".
-- Aggiungi un campo di input testuale (es. `<input type="text" id="bgImage">`) per l'URL dell'immagine di sfondo.
-- Aggiungi uno slider (es. `<input type="range" id="borderRadius" min="0" max="24" step="1">`) per il controllo dell'arrotondamento.
-- Aggiungi uno span per mostrare il valore corrente in pixel (es. `<span id="borderRadiusVal"></span>`).
-- Aggiungi un pulsante `<button id="borderRadiusReset">Reset</button>` di fianco allo slider.
+---
 
-## 4. Binding JS nelle Impostazioni (`options.js`)
-- All'interno della funzione di init o dove vengono agganciati gli eventi (`bindStatic` o simili), lega i nuovi elementi UI ai `settings`:
-  - Al caricamento, setta i valori iniziali di `bgImage` e `borderRadius` leggendoli da `settings`.
-  - Aggiungi un listener `change` (o `input`) sul campo `bgImage` che salvi in `settings.bgImage`.
-  - Aggiungi un listener `input` sullo slider `borderRadius` per mostrare un'anteprima live:
-    - Aggiorna il testo in `borderRadiusVal`.
-    - Richiama `applyTheme` passando i nuovi settings (solo in memoria) per l'anteprima.
-  - Aggiungi un listener `change` sullo slider per chiamare la funzione di salvataggio definitiva (`save()`).
-  - Aggiungi un click listener al bottone `borderRadiusReset` che:
-    - Imposti `settings.borderRadius = 8`.
-    - Resetti il valore visivo dello slider e del testo.
-    - Chiami il salvataggio (`save()`).
+## 1–5. Personalizzazione avanzata — ✅ implementato
 
-## 5. Localizzazione (`i18n.js`)
-- Aggiungi le nuove chiavi per tutte le lingue supportate (it, en, es, fr, de, pt). Esempi:
-  - Titolo sezione: "Avanzate" (Avanzate / Advanced / Avanzado...).
-  - Input immagine: "Immagine di sfondo (URL)" (Immagine di sfondo / Background Image...).
-  - Slider arrotondamento: "Arrotondamento bordi" (Arrotondamento / Corner Radius...).
-  - Bottone reset: "Reset" (Reset / Réinitialiser...).
-  - Placeholder: "https://...".
+**Obiettivo:** immagine di sfondo via URL e arrotondamento dei bordi regolabile, con reset.
 
-## Note Importanti per l'Agente
-- Controlla la sanificazione dell'URL per lo sfondo in `applyTheme` per evitare *CSS injection*.
-- Verifica che il layout generale delle card e degli input resista visivamente sia con arrotondamento `0px` sia con il valore massimo `24px`.
-- Esegui le modifiche in modo incrementale per assicurarti di non introdurre bug nelle funzionalità correnti.
+- **Modello dati**: `DEFAULT_SETTINGS` (`common.js`) include `bgImage: ""` e `borderRadius: 8`.
+- **Validazione**: in `sanitizeSettings()` di `background.js` (il sanitizzatore vive lì, non in
+  `common.js` come suggeriva lo spec): `bgImage` stringa trimmata, max 2048 caratteri → `""`
+  altrimenti; `borderRadius` fallback **8** se mancante/invalido, altrimenti **clamp 0–24**.
+- **`applyTheme()`** (`common.js`): inietta `--bg-img` come `url("…")` — escaping di `"` e `\` e
+  rimozione dei caratteri di controllo, così un URL malevolo non esce dalla `url()` (niente
+  CSS injection); la proprietà viene rimossa quando l'URL è vuoto. Inietta
+  `--border-radius: Npx` (lo `0` è ammesso e rispettato).
+- **CSS**:
+  - `common.css`: `body` passa a `background-color` + `background-image: var(--bg-img, none)`
+    con `cover/center/fixed`; radius fissi sostituiti — `.card` → `calc(var(--border-radius, 8px) + 6px)`,
+    input/bottoni → `var(--border-radius, 8px)`.
+  - `dashboard.css`: `body` usa `background-color` (lo shorthand `background:` azzererebbe
+    l'immagine); radius derivati dalla variabile (input/bottoni `+2px`, `dialog` `+6px`).
+  - `popup.css`: radius parametrizzati con la stessa variabile (`.stat` `+2px`, `.link-btn`
+    `var()`) — estensione richiesta in un secondo momento.
+  - `block.css`: volutamente invariato — i suoi radius sono forme (cerchi 50%, pillola 999px),
+    non angoli da regolare.
+- **UI** (`options.html`/`options.css`/`options.js`): card **"Avanzate"** in fondo alla sezione
+  Aspetto — input testuale URL sfondo, slider 0–24 con lettura live in `px` e bottone Reset.
+  `renderAdvanced()` (stesso pattern di `renderTypography`): anteprima live su `input`
+  (immagine e raggio via `applyTheme` in memoria), persistenza su `change`, reset a 8 + save.
+- **i18n**: chiavi `advanced_title`, `bg_image`, `bg_image_ph`, `border_radius`,
+  `reset_advanced` in tutte e sei le lingue (it/en/es/fr/de/pt).
+- **e2e — sezione 11**: card/controlli renderizzati e tradotti, anteprima live del raggio
+  (variabile 20px → card 26px), persistenza, propagazione alla dashboard già aperta, reset a 8,
+  anteprima/persistenza dello sfondo, **sicurezza CSS-injection** (URL con doppi apici) e
+  sanitizzazione (clamp/trim).
 
-## 6. Minimalista Pro e Blocco per Categorie (Nuove Feature)
+---
 
-**Obiettivo:**
-Introdurre macro-categorie precompilate (Social, Adulti, News, ecc.) disponibili per tutti gli utenti, e implementare le nuove funzionalità "Hardcore" esclusive per il piano PRO. Le funzioni devono integrarsi perfettamente tra loro.
+## 6A. Categorie di siti (per tutti i piani) — ✅ implementato
 
-### A. Categorie di siti (Per Tutti i piani)
-- Modificare il modello dati per supportare la selezione rapida di "Categorie" precompilate in aggiunta ai singoli domini.
-- Un utente Free potrà scegliere la categoria (es. Adulti) e decidere se applicare il "Tieni premuto" con timer o il Blocco Standard, con un limite di tempo giornaliero.
+**Obiettivo:** macro-categorie precompilate selezionabili accanto ai singoli domini, con
+modalità e limite giornaliero.
 
-### B. Funzionalità PRO 
-- **Cold Turkey Mode (Blocco Ferreo):** Applicabile a singoli domini o a intere categorie. L'utente imposta un blocco totale irreversibile per X ore o X giorni. Durante questo periodo, l'interfaccia delle opzioni impedirà in ogni modo di disattivare il blocco o ridurre il timer.
-- **Automazione per Fasce Orarie (Scheduling):** Permettere la programmazione dell'attivazione dei blocchi su base settimanale (es. dal lunedì al venerdì dalle 09:00 alle 18:00).
+- **Registry** `CATEGORIES` in `common.js`: Social, Video, News, **Adulti**, Giochi, Shopping —
+  domini **disgiunti** tra categorie (un dominio può però essere anche un singolo sito).
+- **Configurazione** in `settings.categories` (una voce per categoria, fusa col registry in
+  `sanitizeSettings`): `active`, `mode: "hold"|"block"`, `delay` (1–30), `limitMinutes`.
+- **Intercettazione** (`resolveHit` in `background.js`): per ogni dominio si applica **una sola
+  regola** — il sito singolo configurato ha **precedenza** sulla categoria; altrimenti conta la
+  categoria attiva che contiene il dominio. Un sito singolo inattivo non oscura la categoria.
+- **Limite giornaliero di categoria = budget aggregato** (scelta confermata dall'utente):
+  `categoryUsedSeconds()` somma i secondi spesi su *tutti* i domini della categoria (registrati
+  sul dominio canonico dal tracker); superato il budget la navigazione viene bloccata con
+  `r=limit&c=<id>` e la pagina di blocco mostra il totale della categoria. `enforceLimits()`
+  blocca automaticamente anche le schede già aperte oltre budget.
+- **UI**: card "Categorie di siti" nella sezione Focus, righe analoghe ai siti
+  (toggle/modalità/ritardo/limite) con `renderCategories()`.
+- **e2e**: 6 categorie renderizzate e presenti nello storage sanitizzato, attivazione
+  dall'interfaccia, dominio membro intercettato (tieni premuto), **budget aggregato superato** →
+  blocco `limit` con `c=video`.
 
-### C. Gestione della Modalità in Incognito (Problema Siti per Adulti)
-Le estensioni di Chrome non sono attive in incognito di default. Per aggirare il problema in modo trasparente:
-- Nella sezione delle categorie (specialmente se viene selezionata la categoria "Adulti"), usare l'API `chrome.extension.isAllowedIncognitoAccess()`.
-- Se restituisce `false`, mostrare un banner di avviso chiaro: *"Per rendere effettivo il blocco anche in incognito, devi abilitare il permesso nelle impostazioni di Chrome"*.
-- Fornire istruzioni o un bottone che mandi l'utente direttamente a `chrome://extensions/?id=[ID_ESTENSIONE]` per attivare la spunta "Consenti in incognito".
+---
 
-## 7. Integrazione Pagamenti PRO (ExtensionPay)
+## 6B. Funzioni PRO (Cold Turkey + fasce orarie) — ✅ implementato
 
-**Obiettivo:**
-Implementare il sistema di sblocco delle funzioni PRO utilizzando ExtensionPay, sfruttando la sua libreria nativa per Chrome MV3.
+**Obiettivo:** blocco ferreo irreversibile e automazione per fasce orarie, esclusive PRO.
 
-### A. Setup e Configurazione
-- Includere la libreria `ExtPay.js` nel progetto.
-- Aggiornare il `manifest.json` caricando lo script all'interno del Service Worker (`background.js`) e delle pagine UI (`options.html`, `dashboard.html`).
-- Inizializzare l'istanza `ExtPay('nome-estensione-id')` nei file necessari.
+### Cold Turkey (blocco ferreo)
+- Per **singolo sito o intera categoria**: `ctUntil` (timestamp di scadenza) salvato su
+  `sites[]`/`categories[]`; durata in ore/giorni (min 1 minuto).
+- **Vince su tutto**: anche con Focus spento, limite superato o periodo di grazia attivo il
+  target viene bloccato (`r=ct`, messaggio dedicato). Nessuna possibilità di annullare o
+  ridurre la durata (nemmeno col PIN): l'interfaccia disabilita le righe coinvolte e mostra un
+  countdown ⛓ fino alla scadenza.
+- Attivazione via messaggio `coldTurkey` (site|cat), **sempre dietro la verifica live** (sotto).
 
-### B. Gestione dello Stato Utente
-- In `background.js`, implementare la verifica all'avvio o tramite listener: `extpay.getUser().then(user => ... )`.
-- Se `user.paid` è `true`, aggiornare il `chrome.storage.local` impostando un flag `isPro: true`.
-- Assicurarsi che le funzionalità bloccate (Cold Turkey, Categorie PRO, Automazioni) verifichino questo flag nel local storage prima di essere applicate.
+### Fasce orarie settimanali (scheduling)
+- `schedule = { days: [1..7], start, end }` (minuti da mezzanotte, `end` escluso), sanitizzato
+  (`sanitizeSchedule`); configurabile per sito o categoria.
+- Fuori fascia il target **non viene intercettato**; dentro fascia si applica la modalità di
+  base (hold/block + limite). Attivazione/rimozione via messaggio `proSchedule` (sempre dietro
+  la verifica live).
 
-### C. Interfaccia di Pagamento (UI)
-- Nelle Impostazioni (`options.html`) inserire un bottone "Sblocca PRO (Lifetime)" vicino alle funzioni Premium disabilitate.
-- Al click del bottone, lanciare `extpay.openPaymentPage()`.
-- Gestire il callback di avvenuto pagamento per aggiornare l'interfaccia in tempo reale (rimuovere i lucchetti dalle feature PRO e mostrare un messaggio di ringraziamento).
+### Gating PRO (requisiti discussi con l'utente)
+- Nello storage c'è solo una **firma opaca** (`_aT === "x8f9q"` in `settings`, nome e valore non
+  ovvi da cercare) usata **solo per l'interfaccia** (sparire i lucchetti, mostrare gli
+  strumenti). Nessun `isPro: true` banale.
+- Le **azioni critiche non si fidano mai della firma**: `coldTurkey`/`proSchedule` chiamano
+  `verifyProLive()` nel background. Oggi (senza ExtensionPay configurata) approva solo il
+  **toggle di sviluppo** (Info → "PRO — solo sviluppo", chiave `_devPro`); dalla sezione 7 la
+  verifica passa da ExtensionPay. Un "no" definitivo rimuove anche la firma locale
+  falsificata; errore di rete → **fail-closed**.
+- Il codice è pronto per la minificazione in pubblicazione; il toggle di sviluppo va rimosso
+  prima del rilascio.
+- **UI**: card "Funzioni PRO" bloccata (lucchetto) → editor per cold turkey (target + ore/giorni
+  + lista attivi) e fasce (target + giorni + orari + lista con rimozione), messaggi di errore
+  specifici (`pro_denied`, `pro_action_failed`).
+- **i18n**: ~30 chiavi nuove per lingua (le etichette dei giorni si generano dal locale).
+- **e2e**: strumenti bloccati senza abbonamento, firma falsificata rifiutata e **revocata**,
+  toggle di sviluppo (on/off), cold turkey attivato dall'interfaccia con riga disabilitata +
+  chip ⛓ e override del periodo di grazia (`r=ct`), fasce dentro/fuori finestra.
+
+---
+
+## 6C. Modalità in incognito (siti per adulti) — ✅ implementato (non e2e)
+
+- Con la categoria **Adulti** attiva, `options.js` controlla
+  `chrome.extension.isAllowedIncognitoAccess()`; se `false` mostra un banner con bottone che apre
+  `chrome://extensions/?id=<id-estensione>` (spunta "Consenti in incognito").
+- Non coperto dalla suite e2e: forzare `isAllowedIncognitoAccess() === false` non è fattibile in
+  Chrome for Testing (verifica manuale su Chrome reale prima della pubblicazione).
+
+---
+
+## 7. Integrazione pagamenti PRO (ExtensionPay) — ✅ integrato
+
+**Obiettivo:** sblocco delle funzioni PRO via ExtensionPay (acquisto Lifetime), con verifica
+live sul server per le azioni critiche.
+
+### A. Setup e configurazione
+- **`ExtPay.js` vendored** nel progetto (pacchetto npm `extpay` **v3.1.2**, con header di
+  provenienza). ⚠️ Licenza della libreria: **AGPL-3.0-or-later**.
+- Caricata nel service worker via `importScripts("common.js", "i18n.js", "ExtPay.js")` e nelle
+  impostazioni (`options.html`) come `<script src="ExtPay.js">`. **Nessuna modifica al
+  `manifest.json`**: ExtensionPay richiede solo `storage` (già presente).
+- `EXT_PAY_ID` in `common.js` = ID registrato su extensionpay.com; **vuoto = ExtensionPay
+  disabilitato** (in sviluppo le funzioni PRO si testano col toggle in Info). `extpay` è
+  istanziato lazy (`ensureExtPay`) e `extpay.startBackground()` è chiamato una sola volta per
+  esecuzione del worker.
+
+### B. Gestione dello stato utente (background)
+- `refreshProStatus()`: interroga `extpay.getUser()` e riallinea la firma UI (`_aT`) allo stato
+  reale. Chiamata all'**avvio del worker**, su `onInstalled` e `onStartup`; le pagine possono
+  richiederla col messaggio **`proRefresh`** (es. dopo il pagamento).
+- `verifyProLive()` (azioni critiche): toggle di sviluppo → altrimenti `getUser()`; se
+  `user.paid` approva e riallinea la firma; un "non pagato" (o ExtensionPay assente) **revoca
+  la firma**; un errore di rete è **fail-closed** (non sblocca nulla e non tocca l'ultimo stato
+  noto). Falsificare lo storage locale non concede nulla.
+- Gestione firma centralizzata in `setProSig()` (persiste solo se cambia).
+
+### C. Interfaccia di pagamento (UI)
+- Dietro il lucchetto PRO: **"Sblocca PRO (Lifetime)"** → `extpay.openPaymentPage()` e
+  **"Ho già pagato? Accedi"** → `extpay.openLoginPage()`.
+- **Real-time post-pagamento senza content script**: mentre la scheda di pagamento è aperta la
+  pagina impostazioni fa un polling breve di `getUser()`; appena risulta pagato invia
+  `proRefresh`, i lucchetti spariscono e compare il messaggio di ringraziamento. Scelta
+  consapevole e documentata: niente `content_scripts` su `extensionpay.com` (che avrebbe
+  abilitato i callback push `onPaid` ma aggiunto un permesso all'installazione).
+- La pagina reagisce anche ai cambi della sola firma nello storage (`storage.onChanged`):
+  revoche/assegnazioni esterne aggiornano i lucchetti all'istante.
+- In una build senza `EXT_PAY_ID` il click sul bottone mostra l'avviso "ExtensionPay non è
+  configurato" (nessuna apertura di pagine).
+- **Privacy**: l'unica comunicazione esterna è la verifica dello stato di pagamento; i testi
+  delle Info (6 lingue) sono stati aggiornati di conseguenza.
+- **i18n**: chiavi `pro_unlock`, `pro_login`, `pro_thanks`, `pro_pay_error`,
+  `pro_not_configured`; testi `pro_locked_hint`/`pro_denied` aggiornati (6 lingue).
+- **e2e (sezione 12)**: UI di sblocco presente (acquisto + login), avviso in build non
+  configurata, `proRefresh` senza ExtensionPay → `ok, paid:false` e firma invariata. Il flusso
+  di pagamento reale non è testabile senza un account/ID registrato su extensionpay.com.
+
+---
+
+## 8. Elenco e modifica dei siti delle categorie — ✅ implementato
+
+**Richiesta utente:** vedere la lista reale dei siti di ogni categoria (per tutti) e poterla
+modificare (solo PRO).
+
+- **Elenco (per tutti)**: ogni riga categoria è ora espandibile (freccia ▶): mostra i domini
+  della categoria come chip, con conteggio aggiornato. Nessun blocco per la sola visualizzazione.
+- **Modifica (PRO)**: nella riga espansa compare "✎ Modifica siti" (aggiungi dominio con input,
+  ✕ per rimuovere dai chip, "Fatto" per uscire). Per i non-PRO compare invece un bottone
+  "🔒 PRO · Modifica siti" che mostra l'avviso `cat_edit_pro` senza cambiare nulla.
+- **Modello dati**: lista personalizzata in `settings.categories[].domains`; se assente si usano
+  i domini precompilati del registry. Nuovo helper `categoryDomains(settings, id)` usato ovunque
+  (`hostCategory` e `categoryUsedSeconds` ora accettano `settings`): intercettazione, budget
+  aggregato, `enforceLimits()` e pagina di blocco lavorano sui **domini effettivi**.
+- **Gating**: la sanitizzazione mantiene `domains` personalizzati **solo con la firma PRO**
+  (altrimenti registry); il salvataggio passa dal nuovo messaggio **`proSaveCategories`**, che
+  chiama `verifyProLive()` — stessa protezione anti-forgery di cold turkey/fasce (rifiuto +
+  revoca della firma UI se falsificata).
+- **UI/UX**: stato riga (espansa/modifica) e messaggi di esito mantenuti in memoria per riga
+  (`catUi`), messaggi inline temporanei.
+- **i18n**: chiavi `cat_view_title`, `cat_edit`, `cat_add`, `cat_add_ph`, `cat_done`,
+  `cat_del_title`, `cat_no_domains`, `cat_dup`, `cat_saved_ok`, `cat_edit_pro` (6 lingue).
+- **e2e**: lista dei siti visibile per tutti (es. `instagram.com` in Social), modifica bloccata
+  per i free (avviso, nessuna lista custom), aggiunta di un dominio personalizzato a una
+  categoria dall'interfaccia come PRO (persistita nello storage).
+
+---
+
+## 9. Card PRO premium — ✅ implementato
+
+**Richiesta utente:** dare alla card delle funzioni PRO un aspetto "premium" per invogliare
+all'acquisto.
+
+- **Design**: bordo con gradiente (viola→azzurro→oro) su sfondo card, badge **PRO**, tagline e
+  lista di 4 funzioni con icone (⛓ Cold Turkey, 🕒 Fasce orarie, 🎨 Temi PRO in gradiente,
+  ✏️ Categorie personalizzate).
+- **Pannello pagamento**: bottone principale con gradiente "Sblocca PRO (Lifetime)" +
+  secondario "Ho già pagato? Accedi" (stile ghost), più messaggi di errore dedicati.
+- **Compatibilità**: modifica solo visiva — id e struttura esistenti (`proLocked`, `proTools`,
+  `proUnlock`, `proLogin`, `proMsg`, `proPayRow`) invariati, così JS e test continuano a
+  funzionare senza modifiche.
+
+---
+
+## 10. Temi PRO con gradienti + anteprima gratuita — ✅ implementato
+
+**Richiesta utente:** temi custom per PRO con sfondi in gradiente, e possibilità per i non-PRO
+ di vederli in anteprima (per invogliare all'acquisto).
+
+- **Registry**: `PRO_THEMES` in `common.js` con 4 temi — Aurora, Ember, Lagoon, Royal — ognuno
+  con due colori di gradiente (`grad`) + `fg`/`accent`/`card`/`muted`/`border` coerenti.
+- **Rendering**: `applyTheme()` inietta `--bg-grad` (gradiente a 160°); il `body` in
+  `common.css` impila **immagine utente sopra gradiente sopra colore** (layer "none" = assenti).
+  Vale per impostazioni, dashboard e popup (la pagina di blocco non carica `common.css`).
+- **Gating**: `sanitizeSettings()` conserva un tema PRO in `settings.theme` **solo con la firma**
+  (`_aT`); `themeColors()` per i non-PRO ripiega su Midnight. Un utente free non può mai
+  **persistere** un tema PRO (solo vederlo in anteprima).
+- **Anteprima gratuita**: griglia dedicata "👑 Temi PRO" sotto i temi normali, con card
+  bloccate 🔒. Il click su una card (non-PRO) applica il gradiente **solo in memoria**
+  (`applyTheme(..., allowProTheme)`), mostra la barra "Anteprima del tema PRO: <nome>" con
+  "Sblocca PRO" (porta alla card di pagamento in Focus) e "Chiudi anteprima"; scegliere un
+  tema normale chiude l'anteprima. Con PRO attivo il click applica e salva come un tema normale.
+- **i18n**: chiavi `pro_tagline`, `pro_feat_*` (4 voci della card premium), `pro_theme_section`,
+  `pro_theme_hint`, `pro_preview_label`, `pro_preview_close` (6 lingue).
+- **e2e**: card PRO renderizzate come nel registry, anteprima per i free (barra visibile +
+  `--bg-grad` applicato, tema NON salvato nello storage), chiusura anteprima (barra nascosta +
+  gradiente rimosso), con PRO attivo il tema gradiente si applica e si salva (`pr-lagoon`).
+
+---
+
+## Checklist per la pubblicazione
+
+- [ ] Registrare l'estensione su extensionpay.com e impostare il suo ID in `EXT_PAY_ID`
+      (`common.js`) — oggi vuoto: in produzione senza ID le funzioni PRO restano bloccate.
+- [ ] Rimuovere il toggle di sviluppo: UI in Info (`proTestToggle`), chiave `_devPro`, messaggio
+      `proTest` e il ramo di sviluppo in `verifyProLive()`.
+- [ ] Valutare l'impatto della licenza **AGPL-3.0** di `ExtPay.js` sul progetto.
+- [ ] Verifica manuale su Chrome reale del banner incognito (categoria Adulti).
+- [ ] (Facoltativo) dashboard/popup non caricano ExtPay: nessuna superficie PRO, per ora.

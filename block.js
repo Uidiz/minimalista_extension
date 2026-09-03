@@ -4,7 +4,8 @@
 
 const params = new URLSearchParams(location.search);
 const TARGET_URL = params.get("u") || "";
-const REASON = params.get("r") || "hold"; // hold | limit | block
+const REASON = params.get("r") || "hold"; // hold | limit | block | ct
+const CATEGORY = params.get("c") || "";   // categoria (per il limite aggregato)
 
 const RING_C = 2 * Math.PI * 54;
 
@@ -36,12 +37,19 @@ async function init() {
   ring.style.strokeDashoffset = RING_C;
 
   if (REASON === "limit") {
-    const used = await usageToday(site ? site.domain : null);
+    // limite di un singolo sito oppure budget aggregato di una categoria
+    const statsNow = await getStats();
+    const used = CATEGORY
+      ? categoryUsedSeconds(CATEGORY, statsNow, null, settings)
+      : ((statsNow.byDay[dayKey()] || {})[(site ? site.domain : "")] || 0);
     el("message").textContent = t("block_limit_msg", { time: fmtDuration(used) });
     showLocked("⏳");
   } else if (REASON === "block") {
     el("message").textContent = t("block_blocked_msg");
     showLocked("🔒");
+  } else if (REASON === "ct") {
+    el("message").textContent = t("block_ct_msg");
+    showLocked("⛓");
   } else {
     const word = delay === 1 ? t("hold_second") : t("hold_seconds");
     el("message").textContent = t("block_hold_msg", { n: delay, word });
