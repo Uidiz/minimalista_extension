@@ -77,6 +77,7 @@ async function init() {
   await chrome.alarms.create("minimalista-tick", { periodInMinutes: 0.5 });
   await resumeTracking(); // riparte subito a contare la scheda attiva, senza aspettare un evento
   enforceLimits();        // e blocca subito eventuali siti già oltre il limite
+  sweepBlocked();         // e recupera le navigazioni sfuggite a onBeforeNavigate (SW freddo, SPA…)
   refreshProStatus();     // allinea la firma UI allo stato reale su ExtensionPay
 }
 
@@ -207,6 +208,7 @@ function ensureListeners() {
     pruneStats();
     await saveStats();
     enforceLimits(); // limite giornaliero superato → blocco automatico anche a pagina aperta
+    sweepBlocked();  // navigazioni sfuggite (SW freddo, SPA, siti aperti prima del blocco)
   });
 
   /* ---------- sincronizzazione cache con storage ---------- */
@@ -457,6 +459,43 @@ async function enforceLimits() {
       }
     } catch { /* il tab può sparire durante la query: nessun problema */ }
   }
+}
+
+// Spazza le schede già aperte: se una pagina web aperta dovrebbe essere bloccata
+// (hold / block / limite / cold turkey) viene reindirizzata alla pagina di blocco.
+// Copre i casi in cui onBeforeNavigate non è scattato: service worker in cold start
+// (tipico della prima navigazione di una sessione incognito), navigazioni SPA senza
+// reload, siti aperti prima dell'attivazione del blocco. Rispetta il periodo di grazia.
+async function sweepBlocked() {
+  if (!settings) return;
+  const now = Date.now();
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const t of tabs) {
+      if (!t.url || !/^https?:/i.test(t.url)) continue; // solo pagine web
+      if (grace[t.id] && grace[t.id] > now) continue;   // periodo di grazia attivo
+      const hit = resolveHit(t.url);
+      if (!hit) continue;
+      // stesso ordine di priorità dell'intercettazione alla navigazione:
+      // cold turkey > Focus spento > fascia oraria > limite > grazia > modalità
+      const ctUntil = hit.site ? (hit.site.ctUntil || 0) : (hit.conf.ctUntil || 0);
+      if (ctUntil > now) { intercept(t.id, t.url, "ct"); continue; }
+      if (!settings.focusEnabled) continue;
+      const sched = hit.site ? hit.site.schedule : (hit.conf.schedule || null);
+      if (sched && !scheduleActive(sched)) continue;
+      const limit = hit.site ? hit.site.limitMinutes : (hit.conf.limitMinutes || 0);
+      if (limit > 0) {
+        const used = hit.site
+          ? ((stats.byDay[dayKey()] || {})[hit.site.domain] || 0)
+          : categoryUsedSeconds(hit.conf.id, stats, null, settings);
+        if (used >= limit * 60) {
+          intercept(t.id, t.url, "limit", hit.site ? null : hit.conf.id);
+          continue;
+        }
+      }
+      const mode = hit.site ? hit.site.mode : (hit.conf.mode || "hold");
+      intercept(t.id, t.url, mode === "block" ? "block" : "hold");
+    }  } catch { /* il tab può sparire durante la query: nessun problema */ }
 }
 
 function endTracker(now = Date.now()) {

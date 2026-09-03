@@ -215,6 +215,7 @@ function save() {
     applyCurrentTheme();
     updateThemeSelection();
     renderSites(); // riallinea i controlli dopo la sanitizzazione (es. delay clamp)
+    checkIncognitoBanner(); // attivazione/disattivazione di blocchi → aggiorna il banner
   });
 }
 
@@ -876,7 +877,10 @@ function renderCategories() {
   checkIncognitoBanner();
 }
 
-// Avviso incognito: le estensioni non sono attive in incognito di default.
+// Avviso incognito: le estensioni non sono attive in incognito di default, quindi
+// chi naviga in incognito non verrebbe mai bloccato. Il banner è un piccolo easter
+// egg: compare SOLO quando si attiva la categoria "Adulti" (le estensioni non agiscono
+// in incognito, e i siti per adulti sono quelli che più spesso si cercano lì).
 let incogBound = false;
 async function checkIncognitoBanner() {
   const banner = el("incogBanner");

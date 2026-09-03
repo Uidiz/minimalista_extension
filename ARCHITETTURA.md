@@ -106,10 +106,23 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 - L'attivazione di entrambe passa da una **verifica live** dello stato PRO (sezione 5.9).
 
 ### 2.9 Modalità in incognito
-- Con la categoria **Adulti** attiva, le impostazioni controllano
-  `chrome.extension.isAllowedIncognitoAccess()`: se l'accesso in incognito è disabilitato
+- **Le estensioni non agiscono in incognito di default**: va abilitato manualmente
+  "Consenti in incognito" (chrome://extensions → Minimalista → Dettagli). Senza, l'estensione
+  è completamente inerte in incognito: nessun blocco, nessuna pagina di blocco.
+- **Il manifest dichiara `"incognito": "split"`** (obbligatorio per far funzionare la pagina
+  di blocco in incognito): con la modalità "spanning" (default) Chrome blocca la navigazione
+  verso le pagine dell'estensione nel frame principale di una scheda incognito
+  (ERR_BLOCKED_BY_CLIENT: "Questa pagina è stata bloccata da Chrome"). L'intercettazione
+  scatta comunque, ma al posto della pagina di blocco minimalista compare l'errore di Chrome.
+  Con "split" le pagine dell'estensione si caricano in incognito e
+  `chrome.storage.local`/`sync` restano **condivise** tra normale e incognito (le impostazioni
+  e le statistiche sono le stesse; `storage.session`, memoria-only, è separato ma coerente:
+  la pagina di blocco e il suo background sono nello stesso contesto).
+- **Banner easter egg**: quando si attiva la categoria **Adulti**, le impostazioni controllano
+  `chrome.extension.isAllowedIncognitoAccess()`; se l'accesso in incognito è disabilitato
   mostrano un banner con un bottone che apre `chrome://extensions/?id=<id-estensione>`
-  (spunta "Consenti in incognito").
+  (spunta "Consenti in incognito"). Scelta voluta: il banner compare **solo** con la categoria
+  Adulti attiva (chi blocca siti per adulti è chi più spesso naviga in incognito).
 
 ### 2.10 Pagamenti PRO (ExtensionPay)
 - L'acquisto (piano **Lifetime**) è gestito da **ExtensionPay**: la libreria `ExtPay.js` è
@@ -149,6 +162,9 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 
 ### Manifest (`manifest.json`)
 - **MV3**, service worker in background, nessuna pagina `background.html`.
+- **`incognito: "split"`**: necessaria perché la pagina di blocco possa essere caricata nel
+  frame principale di una scheda in incognito (con "spanning" Chrome la blocca con
+  ERR_BLOCKED_BY_CLIENT; le impostazioni restano condivise via `chrome.storage.local`).
 - **Permissions**: `storage`, `tabs`, `webNavigation`, `alarms`.
   - Nessun `host_permissions`: l'intercettazione avviene tramite l'API `webNavigation`
     (evento `onBeforeNavigate`), che non richiede accesso agli host.
@@ -439,7 +455,16 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
 
 - **Intercettazione via `webNavigation` invece di `declarativeNetRequest`**: nessuna
   `host_permissions`, nessuna gestione di regole dinamiche; il prezzo è che la navigazione
-  viene reindirizzata con `tabs.update` (un lampo di pagina in casi rari).
+  viene reindirizzata con `tabs.update` (un lampo di pagina in casi rari). Limite noto del
+  `webNavigation`: con il service worker addormentato (tipico della prima navigazione di una
+  sessione incognito) l'evento `onBeforeNavigate` può non essere consegnato e la navigazione
+  sfuggire. Per questo c'è **`sweepBlocked()`**: a ogni avvio del worker e a ogni tick
+  dell'alarm (30 s) le schede web aperte che dovrebbero essere bloccate vengono reindirizzate
+  alla pagina di blocco (rispettando il periodo di grazia), recuperando così le navigazioni
+  sfuggite e coprendo anche le navigazioni SPA senza reload.
+- **Pagina di blocco in incognito**: con "spanning" Chrome rifiuta la navigazione verso
+  `block.html` nel frame principale di una scheda incognito (ERR_BLOCKED_BY_CLIENT);
+  `"incognito": "split"` nel manifest risolve (vedi 2.9).
 - **SPA e navigazioni interne**: la navigazione interna ai siti (es. scrolling infinito o
   cambio pagina senza reload) non genera nuovi `onBeforeNavigate`; il periodo di grazia copre
   le navigazioni successive, dopodiché si torna al blocco — fedele alla filosofia "ogni accesso
@@ -509,6 +534,11 @@ node e2e-test.js
      (Il banner incognito non è coperto: non è simulabile in Chrome for Testing.)
 - Richiede Node ≥ 22 (fetch + WebSocket globali).
 - Se `CHROME_BIN` è impostato, usa quel binario invece di Chrome for Testing.
+- **Incognito** (verifica manuale): `node tools/incognito-repro.js` testa i due stati su Chrome
+  for Testing — accesso incognito spento (default) → estensione inerte in incognito, blocco OK
+  in normale; toggle "Consenti in incognito" da chrome://extensions (persiste in Secure
+  Preferences, si applica al riavvio dell'estensione); recupero delle navigazioni sfuggite
+  tramite `sweepBlocked()`.
 
 ---
 

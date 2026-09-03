@@ -124,11 +124,27 @@ modalità e limite giornaliero.
 
 ## 6C. Modalità in incognito (siti per adulti) — ✅ implementato (non e2e)
 
-- Con la categoria **Adulti** attiva, `options.js` controlla
+- **Le estensioni non agiscono in incognito di default**: senza "Consenti in incognito"
+  l'estensione è completamente inerte in incognito (verificato: il sito si apre libero).
+- **`"incognito": "split"` nel manifest** (fix del bug reale): con "spanning" (default)
+  l'intercettazione scatta in incognito ma Chrome blocca la navigazione verso `block.html`
+  nel frame principale di una scheda incognito → ERR_BLOCKED_BY_CLIENT
+  ("<id-estensione> è bloccato / Questa pagina è stata bloccata da Chrome") al posto della
+  pagina di blocco. Documentato in developer.chrome.com (manifest incognito + web-accessible
+  resources). Con "split" le pagine dell'estensione si caricano in incognito e
+  `chrome.storage.local` resta condivisa tra normale e incognito.
+- **Banner easter egg**: attivando la categoria **Adulti**, `options.js` controlla
   `chrome.extension.isAllowedIncognitoAccess()`; se `false` mostra un banner con bottone che apre
-  `chrome://extensions/?id=<id-estensione>` (spunta "Consenti in incognito").
+  `chrome://extensions/?id=<id-estensione>` (spunta "Consenti in incognito"). Scelta voluta:
+  compare **solo** con la categoria Adulti attiva — una "chicca" per chi blocca i siti per adulti.
+- **Recupero navigazioni sfuggite** (`sweepBlocked()` in `background.js`): con l'accesso
+  incognito attivo, la prima navigazione di una sessione può sfuggire perché il service worker
+  parte freddo e `onBeforeNavigate` non è garantito. La sweep blocca le schede aperte che
+  dovrebbero essere bloccate a ogni avvio del worker e a ogni tick dell'alarm (30 s), rispettando
+  il periodo di grazia.
 - Non coperto dalla suite e2e: forzare `isAllowedIncognitoAccess() === false` non è fattibile in
   Chrome for Testing (verifica manuale su Chrome reale prima della pubblicazione).
+  `tools/incognito-repro.js` copre lo stato "accesso spento" e il recupero via sweep.
 
 ---
 
