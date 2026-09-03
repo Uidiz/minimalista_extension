@@ -1,0 +1,224 @@
+/* dashboard.css — nuova scheda (home minimalista) */
+body {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 40px 16px 60px;
+  background: var(--bg);
+}
+
+.phone {
+  width: 100%;
+  max-width: 460px;
+}
+
+/* ---------- orologio ---------- */
+header { text-align: center; margin-bottom: 30px; }
+
+#clock {
+  font-size: 4.6rem;
+  font-weight: 200;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+#date {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 4px;
+  text-transform: capitalize;
+}
+
+#status {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
+#statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+#status.on #statusDot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+#status.on { color: var(--fg); }
+
+/* ---------- card-head ---------- */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-head h2 { margin-bottom: 0; }
+
+button.ghost {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+}
+button.ghost:hover { color: var(--accent); }
+
+/* ---------- ricerca ---------- */
+#searchForm { display: flex; gap: 8px; }
+
+/* ---------- todo ---------- */
+#todoAdd {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* textbox "modern": padding generoso, nessun testo attaccato ai bordi,
+   colori del tema e anello di focus accent. I selettori per id valgono
+   anche per gli input senza attributo type. */
+#searchForm input,
+#todoAdd input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+#searchForm input:focus,
+#todoAdd input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+#searchForm button,
+#todoAdd button {
+  border-radius: 10px;
+}
+#searchForm button {
+  padding: 0 16px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+#todoAdd button {
+  padding: 0 14px;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.todo-item:last-of-type { border-bottom: none; }
+
+.todo-item .t-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.todo-item .t-text { flex: 1; overflow-wrap: anywhere; }
+.todo-item.done .t-text { text-decoration: line-through; color: var(--muted); }
+
+.todo-item .t-prio { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.t-prio.high { background: #ff8a80; }
+.t-prio.medium { background: #ffd180; }
+.t-prio.low { background: #80d8ff; }
+.todo-item.done .t-prio { opacity: 0.25; }
+
+.todo-item .t-actions { display: flex; gap: 4px; opacity: 0; }
+.todo-item:hover .t-actions,
+.todo-item:focus-within .t-actions { opacity: 1; }
+.todo-item .t-actions button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+.todo-item .t-actions button:hover { color: var(--fg); }
+.todo-item .t-actions button.danger:hover { color: #ff8a80; }
+
+.empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 8px 0; }
+
+/* ---------- dialog ---------- */
+dialog {
+  margin: auto; /* il reset globale * { margin: 0 } azzera il margin:auto UA che centra il modal */
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  width: min(360px, calc(100vw - 40px));
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog h3 { margin-bottom: 14px; }
+dialog form { display: flex; flex-direction: column; gap: 12px; }
+.d-row { display: flex; gap: 12px; }
+.d-row label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; color: var(--muted); }
+.d-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+/* ---------- preferiti ---------- */
+#favList { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.fav-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 0.92rem;
+}
+.fav-item a { color: var(--fg); }
+.fav-item a:hover { color: var(--accent); text-decoration: none; }
+.fav-item .fav-x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 0 2px 0 8px;
+  font-size: 0.9rem;
+}
+.fav-item .fav-x:hover { color: #ff8a80; }
+
+#favAdd { display: flex; gap: 8px; margin-top: 12px; }
+#favAdd input:first-child { flex: 1; }
+#favAdd input:nth-child(2) { flex: 1.6; }
+
+/* ---------- focus ---------- */
+#focusSites { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.site-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  color: var(--fg);
+  cursor: pointer;
+}
+.site-chip:hover { border-color: var(--accent); }
+.site-chip.off { opacity: 0.45; text-decoration: line-through; }
+
+#todayStats { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+#todayStats strong { color: var(--fg); font-weight: 500; }
+
+/* ---------- footer ---------- */
+footer { text-align: center; margin-top: 8px; font-size: 0.85rem; }

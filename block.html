@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Minimalista</title>
+  <link rel="stylesheet" href="block.css">
+</head>
+<body>
+  <main id="card">
+    <div id="avatar">I</div>
+    <h1 id="domain">sito</h1>
+    <p id="message" data-i18n="hold_to_continue">Tieni premuto per continuare.</p>
+
+    <div id="hold-wrap">
+      <svg id="ring" viewBox="0 0 120 120" width="150" height="150" aria-hidden="true">
+        <circle class="ring-track" cx="60" cy="60" r="54"></circle>
+        <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="54"></circle>
+      </svg>
+      <button id="holdBtn" type="button" aria-label="Tieni premuto per continuare" data-i18n-aria="hold_to_continue">
+        <span id="holdSecs">5</span>
+        <span id="holdLabel" data-i18n="hold">Tieni premuto</span>
+      </button>
+      <div id="lockedIcon" hidden>🔒</div>
+    </div>
+
+    <button id="backBtn" type="button" data-i18n="back">← Torna indietro</button>
+    <p id="quote"></p>
+  </main>
+  <script src="common.js"></script>
+  <script src="i18n.js"></script>
+  <script src="block.js"></script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+/* common.css — stili base condivisi (variabili di tema, card, switch, input) */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* l'attributo hidden deve vincere su qualsiasi display: flex/grid dei componenti */
+[hidden] { display: none !important; }
+
+html { color-scheme: dark; }
+
+body {
+  background: var(--bg, #232326);
+  color: var(--fg, #f2f2f0);
+  /* il font scelto in Aspetto → Tipografia arriva da --app-font (impostato da applyTheme su <html>);
+     il fallback vale solo prima che il tema venga applicato */
+  font-family: var(--app-font, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif);
+  line-height: 1.5;
+}
+
+a { color: var(--accent, #9db8ff); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3 { font-weight: 300; letter-spacing: 0.02em; }
+h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted, #9a9aa2); margin-bottom: 14px; }
+
+/* ---------- card ---------- */
+.card {
+  background: var(--card, #2e2e33);
+  border: 1px solid var(--border, #3a3a41);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+
+/* ---------- interruttore ---------- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border, #3a3a41);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.switch .slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: var(--fg, #f2f2f0);
+  transition: transform 0.15s ease;
+}
+.switch input:checked + .slider { background: var(--accent, #9db8ff); }
+.switch input:checked + .slider::before { transform: translateX(18px); background: var(--bg, #232326); }
+.switch.small { width: 34px; height: 20px; }
+.switch.small .slider::before { width: 14px; height: 14px; }
+.switch.small input:checked + .slider::before { transform: translateX(14px); }
+
+/* ---------- input / select / bottoni ---------- */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input:not([type]),
+select {
+  background: var(--bg, #232326);
+  border: 1px solid var(--border, #3a3a41);
+  border-radius: 8px;
+  color: var(--fg, #f2f2f0);
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 9px 12px;
+}
+input::placeholder { color: var(--muted, #9a9aa2); opacity: 1; }
+input:focus, select:focus { outline: 1px solid var(--accent, #9db8ff); }
+
+/* l'autofill di Chrome sovrascrive sfondo e testo: forzalo sui colori del tema */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg, #232326) inset;
+  -webkit-text-fill-color: var(--fg, #f2f2f0);
+  caret-color: var(--fg, #f2f2f0);
+}
+
+button {
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--card, #2e2e33);
+  border: 1px solid var(--border, #3a3a41);
+  color: var(--fg, #f2f2f0);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent, #9db8ff); color: var(--accent, #9db8ff); }
+button.primary { background: var(--accent, #9db8ff); border-color: var(--accent, #9db8ff); color: var(--bg, #232326); font-weight: 600; }
+button.primary:hover { opacity: 0.9; color: var(--bg, #232326); }
+
+.hint { color: var(--muted, #9a9aa2); font-size: 0.82rem; line-height: 1.5; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.chip {
+  display: inline-block;
+  background: var(--bg, #232326);
+  border: 1px solid var(--border, #3a3a41);
+  color: var(--muted, #9a9aa2);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.chip.due { color: var(--accent, #9db8ff); }
+.chip.late { color: #ff8a80; border-color: #ff8a80; }

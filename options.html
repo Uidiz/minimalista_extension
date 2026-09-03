@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="options_title">Minimalista — Impostazioni</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+
+  <!-- Schermata di blocco PIN -->
+  <div id="lockScreen" hidden>
+    <div class="lock-card">
+      <div id="lockLogo">m</div>
+      <h1>Minimalista</h1>
+      <p class="hint" data-i18n="pin_locked_hint">Le impostazioni sono protette da PIN. Inseriscilo per continuare.</p>
+      <input type="password" id="pinInput" placeholder="PIN" data-i18n-ph="pin_ph" autocomplete="off">
+      <button class="primary" id="pinUnlock" data-i18n="pin_unlock">Sblocca</button>
+      <p class="hint" id="pinError"></p>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <aside>
+      <div class="brand">Minimalista</div>
+      <nav>
+        <button data-sec="focus" class="active" data-i18n="nav_focus">Focus</button>
+        <button data-sec="stats" data-i18n="nav_stats">Statistiche</button>
+        <button data-sec="appearance" data-i18n="nav_appearance">Aspetto</button>
+        <button data-sec="security" data-i18n="nav_security">Sicurezza</button>
+        <button data-sec="info" data-i18n="nav_info">Info</button>
+      </nav>
+      <a href="dashboard.html" class="back-link" data-i18n="back_link">← Nuova scheda</a>
+    </aside>
+
+    <main>
+
+      <!-- ================= FOCUS ================= -->
+      <section id="sec-focus">
+        <div class="card">
+          <div class="row">
+            <div>
+              <h2 data-i18n="focus_mode">Modalità Focus</h2>
+              <p class="hint" data-i18n="focus_mode_hint">Quando è attiva, i siti elencati vengono intercettati prima di aprirsi.</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="focusToggle" aria-label="Modalità Focus" data-i18n-aria="focus_mode"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="sites_to_limit">Siti da limitare</h2>
+          <div id="siteRows"></div>
+          <form id="siteAdd" autocomplete="off">
+            <input type="text" id="siteInput" list="siteSuggestions" placeholder="es. instagram.com" data-i18n-ph="site_input_ph">
+            <datalist id="siteSuggestions"></datalist>
+            <button type="submit" data-i18n="add">Aggiungi</button>
+          </form>
+          <p class="hint" style="margin-top:10px" data-i18n-html="focus_modes_hint">
+            <strong>Tieni premuto</strong>: prima di aprire il sito devi tenere premuto per i secondi indicati.
+            <strong>Blocca</strong>: il sito non si apre mai. <strong>min/giorno</strong>: limite massimo di utilizzo giornaliero (0 = nessun limite).
+          </p>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="grace_period">Periodo di grazia</h2>
+          <p class="hint" data-i18n="grace_hint">Dopo aver tenuto premuto, il sito resta aperto per N minuti senza nuovi blocchi, anche cambiando pagina nella stessa scheda.</p>
+          <div class="inline-field">
+            <input type="number" id="graceInput" min="0" max="120" step="1">
+            <span data-i18n="minutes">minuti</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= STATISTICHE ================= -->
+      <section id="sec-stats" hidden>
+        <div class="card">
+          <h2 data-i18n="stats_last7">Tempo di navigazione — ultimi 7 giorni</h2>
+          <div class="legend">
+            <span class="lg"><span class="sw dist"></span><span data-i18n="legend_distracting">distraenti</span></span>
+            <span class="lg"><span class="sw other"></span><span data-i18n="legend_other">altri</span></span>
+          </div>
+          <div id="weekChart"></div>
+          <div id="weekTotals" class="stat-line"></div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="stats_today_header">Oggi</h2>
+          <div id="todayNumbers" class="stat-line"></div>
+          <div id="topSites"></div>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <p class="hint" data-i18n="reset_stats_hint">Le statistiche vengono azzerate anche rimuovendo il blocco dei siti? No: restano fino a questo comando.</p>
+            <button id="resetStats" class="danger-btn" data-i18n="reset_stats">Azzera statistiche</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= ASPETTO ================= -->
+      <section id="sec-appearance" hidden>
+        <div class="card">
+          <h2 data-i18n="theme">Tema</h2>
+          <div id="themeGrid"></div>
+          <div id="customEditor" hidden>
+            <div class="inline-field" style="margin-top:18px">
+              <label for="ctName" data-i18n="theme_name">Nome</label>
+              <input type="text" id="ctName" maxlength="24" autocomplete="off" style="flex:1;max-width:260px">
+            </div>
+            <div class="ct-color-row" data-target="bg">
+              <span class="ct-label" data-i18n="custom_bg">Sfondo</span>
+              <input type="color" class="ct-picker" data-key="bg" value="#2b2b2e" aria-label="Sfondo" data-i18n-aria="custom_bg">
+              <input type="text" class="ct-hex" data-key="bg" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="ct-color-row" data-target="fg">
+              <span class="ct-label" data-i18n="custom_text">Testo</span>
+              <input type="color" class="ct-picker" data-key="fg" value="#f2f2f0" aria-label="Testo" data-i18n-aria="custom_text">
+              <input type="text" class="ct-hex" data-key="fg" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="ct-color-row" data-target="accent">
+              <span class="ct-label" data-i18n="custom_accent">Accento</span>
+              <input type="color" class="ct-picker" data-key="accent" value="#f2f2f0" aria-label="Accento" data-i18n-aria="custom_accent">
+              <input type="text" class="ct-hex" data-key="accent" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="ct-actions">
+              <button id="ctSave" class="primary" data-i18n="save_theme">Salva tema</button>
+              <button id="ctDelete" class="danger-btn" data-i18n="delete_theme" hidden>Elimina</button>
+              <button id="ctCancel" data-i18n="cancel">Annulla</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="typography">Tipografia</h2>
+          <div class="inline-field">
+            <label for="fontScale" data-i18n="font_size">Dimensione globale</label>
+            <input type="range" id="fontScale" min="60" max="120" step="5">
+            <span id="fontScaleVal">100%</span>
+          </div>
+          <div class="inline-field">
+            <label for="fontFamily" data-i18n="font_style">Stile</label>
+            <select id="fontFamily">
+              <option value="sans" data-i18n="font_sans">Sans Serif</option>
+              <option value="serif" data-i18n="font_serif">Serif</option>
+              <option value="mono" data-i18n="font_mono">Monospace</option>
+              <option value="cursive" data-i18n="font_cursive">Corsivo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="language">Lingua</h2>
+          <div class="inline-field">
+            <select id="langSelect" aria-label="Lingua" data-i18n-aria="language"></select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="search_engine">Motore di ricerca</h2>
+          <div class="inline-field">
+            <select id="searchEngine" aria-label="Motore di ricerca" data-i18n-aria="search_engine"></select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="clock">Orologio</h2>
+          <label class="check-row">
+            <input type="checkbox" id="showSeconds">
+            <span data-i18n="show_seconds">Mostra i secondi sulla nuova scheda</span>
+          </label>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="new_tab">Nuova scheda</h2>
+          <label class="check-row">
+            <input type="checkbox" id="showSearchToggle">
+            <span data-i18n="show_search">Mostra la barra di ricerca web sulla nuova scheda</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- ================= SICUREZZA ================= -->
+      <section id="sec-security" hidden>
+        <div class="card">
+          <h2 data-i18n="security_block">Blocco impostazioni</h2>
+          <p class="hint" data-i18n="security_hint">
+            Imposta un PIN per impedire che queste impostazioni vengano modificate
+            (es. per non poter togliere i blocchi nei momenti di debolezza).
+            La nuova scheda e il popup restano liberi.
+          </p>
+          <div id="pinState"></div>
+          <p class="hint" style="margin-top:12px" data-i18n-html="pin_forgot_hint">
+            Se dimentichi il PIN: apri <code>chrome://extensions</code> → Minimalista → "Ispeziona"
+            (sotto Servizi in background) e nella console digita <code>chrome.storage.local.clear()</code>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ================= INFO ================= -->
+      <section id="sec-info" hidden>
+        <div class="card">
+          <h2>Minimalista</h2>
+          <p data-i18n-html="info_about_1">
+            Estensione Chrome ispirata all'app Android <strong>Minimalista</strong> (launcher
+            minimalista anti-distrazione). L'idea portante è la stessa: quando tenti di aprire un
+            sito distraente, un messaggio ti ferma e ti chiede un gesto <em>intenzionale</em>
+            (tenere premuto) prima di lasciarti passare. In più puoi impostare un limite
+            giornaliero per sito.
+          </p>
+          <p style="margin-top:12px" data-i18n-html="info_about_2">
+            Tutti i dati (impostazioni, ToDo, statistiche) restano <strong>solo sul tuo
+            dispositivo</strong>, in <code>chrome.storage.local</code>. Nessun dato viene inviato
+            da nessuna parte.
+          </p>
+          <p style="margin-top:12px" data-i18n="info_version">Versione 1.0.0 · Sviluppatore: Daniele Terracciano</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="common.js"></script>
+  <script src="i18n.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

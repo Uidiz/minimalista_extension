@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Minimalista</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="brand">Minimalista</div>
+
+  <div class="row">
+    <span id="focusLabel" data-i18n="focus_mode">Modalità Focus</span>
+    <label class="switch"><input type="checkbox" id="focusToggle" aria-label="Modalità Focus" data-i18n-aria="focus_mode"><span class="slider"></span></label>
+  </div>
+
+  <div id="today" class="stat"></div>
+
+  <a href="dashboard.html" target="_blank" class="link-btn" data-i18n="new_tab">Nuova scheda</a>
+  <a href="options.html" target="_blank" class="link-btn" data-i18n="settings">Impostazioni</a>
+
+  <script src="common.js"></script>
+  <script src="i18n.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

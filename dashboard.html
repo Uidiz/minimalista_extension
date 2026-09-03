@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Minimalista</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="phone">
+
+    <header>
+      <div id="clock">--:--</div>
+      <div id="date"></div>
+      <div id="status"><span id="statusDot"></span><span id="statusText"></span></div>
+    </header>
+
+    <section class="card search-card" id="searchCard">
+      <form id="searchForm" autocomplete="off">
+        <input id="searchInput" placeholder="Cerca nel web…" data-i18n-ph="search_ph" aria-label="Cerca nel web" data-i18n-aria="search_ph">
+        <button type="submit" aria-label="Cerca" data-i18n-aria="search" class="search-go">→</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-i18n="todo">ToDo</h2>
+        <button id="todoClearDone" class="ghost" title="Rimuovi le attività completate" data-i18n="todo_clear" data-i18n-title="todo_clear_title">pulisci ✓</button>
+      </div>
+      <div id="todoList"></div>
+      <form id="todoAdd" autocomplete="off">
+        <input id="todoInput" placeholder="Aggiungi un'attività…" data-i18n-ph="todo_ph">
+        <button type="submit" aria-label="Aggiungi" data-i18n-aria="add">+</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-i18n="favorites">Preferiti</h2>
+        <button id="favEdit" class="ghost" data-i18n="fav_edit">modifica</button>
+      </div>
+      <div id="favList"></div>
+      <form id="favAdd" autocomplete="off" hidden>
+        <input id="favName" placeholder="Nome (es. Mail)" data-i18n-ph="fav_name_ph">
+        <input id="favUrl" placeholder="https://…" data-i18n-ph="fav_url_ph">
+        <button type="submit" data-i18n="add">Aggiungi</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-i18n="focus">Focus</h2>
+        <label class="switch"><input type="checkbox" id="focusToggle" aria-label="Modalità Focus" data-i18n-aria="focus_mode"><span class="slider"></span></label>
+      </div>
+      <div id="focusSites"></div>
+      <div id="todayStats"></div>
+    </section>
+
+    <footer>
+      <a href="options.html" id="settingsLink" data-i18n="settings">Impostazioni</a>
+    </footer>
+  </div>
+
+  <dialog id="todoDialog">
+    <form method="dialog" id="todoForm">
+      <h3 data-i18n="todo_dialog_title">Modifica attività</h3>
+      <input type="text" id="dText" placeholder="Cosa devi fare?" data-i18n-ph="todo_what_ph">
+      <div class="d-row">
+        <label><span data-i18n="priority">Priorità</span>
+          <select id="dPriority">
+            <option value="high" data-i18n="prio_high">Alta</option>
+            <option value="medium" selected data-i18n="prio_medium">Media</option>
+            <option value="low" data-i18n="prio_low">Bassa</option>
+          </select>
+        </label>
+        <label><span data-i18n="due">Scadenza</span>
+          <select id="dDue">
+            <option value="none" selected data-i18n="due_none_opt">Nessuna</option>
+            <option value="today" data-i18n="due_today_opt">Oggi</option>
+            <option value="tomorrow" data-i18n="due_tomorrow_opt">Domani</option>
+            <option value="custom" data-i18n="due_custom_opt">Data…</option>
+          </select>
+        </label>
+      </div>
+      <input type="date" id="dDate" hidden>
+      <div class="d-actions">
+        <button type="button" id="dCancel" data-i18n="cancel">Annulla</button>
+        <button type="submit" class="primary" data-i18n="save">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="common.js"></script>
+  <script src="i18n.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
