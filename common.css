@@ -38,7 +38,19 @@ h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.14em; colo
   border-radius: calc(var(--border-radius, 8px) + 6px);
   padding: 20px;
   margin-bottom: 18px;
+  /* hover moderno: la card si solleva con un'ombra morbida e un alone accent
+     (disattivabile da Aspetto → Avanzate: body.no-hover spegne tutto) */
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
 }
+body:not(.no-hover) .card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent, #9db8ff) 50%, var(--border, #3a3a41));
+  box-shadow:
+    0 10px 30px -10px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--accent, #9db8ff) 20%, transparent),
+    0 0 20px -6px color-mix(in srgb, var(--accent, #9db8ff) 30%, transparent);
+}
+body.no-hover .card { transition: none; }
 
 /* ---------- interruttore ---------- */
 .switch {
@@ -130,3 +142,9 @@ button.primary:hover { opacity: 0.9; color: var(--bg, #232326); }
 }
 .chip.due { color: var(--accent, #9db8ff); }
 .chip.late { color: #ff8a80; border-color: #ff8a80; }
+
+/* accessibilità: senza movimento le card si fermano (restano colore e bordo) */
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
+  body:not(.no-hover) .card:hover { transform: none; }
+}

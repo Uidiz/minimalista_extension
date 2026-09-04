@@ -260,13 +260,6 @@
         </div>
 
         <div class="card">
-          <h2 data-i18n="search_engine">Motore di ricerca</h2>
-          <div class="inline-field">
-            <select id="searchEngine" aria-label="Motore di ricerca" data-i18n-aria="search_engine"></select>
-          </div>
-        </div>
-
-        <div class="card">
           <h2 data-i18n="clock">Orologio</h2>
           <label class="check-row">
             <input type="checkbox" id="showSeconds">
@@ -280,6 +273,12 @@
             <input type="checkbox" id="showSearchToggle">
             <span data-i18n="show_search">Mostra la barra di ricerca web sulla nuova scheda</span>
           </label>
+          <!-- il motore di ricerca serve solo se la barra è visibile: stessa card,
+               e viene disabilitato/attenuato quando la barra è nascosta -->
+          <div class="inline-field search-engine-row" id="searchEngineRow">
+            <label for="searchEngine" data-i18n="search_engine">Motore di ricerca</label>
+            <select id="searchEngine" aria-label="Motore di ricerca" data-i18n-aria="search_engine"></select>
+          </div>
         </div>
 
         <div class="card">
@@ -294,6 +293,10 @@
             <span id="borderRadiusVal">8px</span>
             <button type="button" id="borderRadiusReset" data-i18n="reset_advanced" aria-label="Reset" data-i18n-aria="reset_advanced">Reset</button>
           </div>
+          <label class="check-row card-hover-row">
+            <input type="checkbox" id="cardHoverToggle">
+            <span data-i18n="card_hover">Anima le card al passaggio del mouse</span>
+          </label>
         </div>
       </section>
 
@@ -342,6 +345,16 @@
         </div>
       </section>
 
+      <!-- ================= CONFERMA COLD TURKEY ================= -->
+      <dialog id="ctConfirm" class="ct-confirm" aria-labelledby="ctConfirmTitle">
+        <h3 id="ctConfirmTitle" data-i18n="ct_confirm_title">Confermi il blocco ferreo?</h3>
+        <p class="ct-confirm-body" id="ctConfirmBody"></p>
+        <p class="hint ct-confirm-warn" data-i18n-html="ct_confirm_warn"></p>
+        <div class="d-actions">
+          <button type="button" id="ctConfirmCancel" data-i18n="cancel">Annulla</button>
+          <button type="button" id="ctConfirmOk" class="danger-btn" data-i18n="ct_confirm_ok">Sì, attiva il blocco</button>
+        </div>
+      </dialog>
     </main>
   </div>
 

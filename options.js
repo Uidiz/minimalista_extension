@@ -58,6 +58,12 @@ function bindStatic() {
     if (h) switchSection(h);
   });
 
+  // dialog di conferma del blocco ferreo: confermare esegue, chiudere/ESC annulla
+  const ctDialog = el("ctConfirm");
+  el("ctConfirmOk").addEventListener("click", onCtConfirm);
+  el("ctConfirmCancel").addEventListener("click", () => { ctPending = null; ctDialog.close(); });
+  ctDialog.addEventListener("close", () => { ctPending = null; });
+
   // aggiunta sito
   el("siteAdd").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -143,6 +149,7 @@ function renderAll() {
   renderTheme();
   renderTypography();
   renderAdvanced();
+  renderCardHover();
   renderLang();
   renderSearchEngine();
   renderSearchToggle();
@@ -515,6 +522,20 @@ function renderAdvanced() {
   });
 }
 
+let cardHoverBound = false;
+function renderCardHover() {
+  el("cardHoverToggle").checked = settings.cardHover !== false;
+  if (!cardHoverBound) {
+    cardHoverBound = true;
+    el("cardHoverToggle").addEventListener("change", (e) => {
+      settings.cardHover = e.target.checked;
+      // applyTheme gestisce la classe no-hover su <body>: effetto immediato qui e nelle altre pagine
+      applyTheme(document.documentElement, settings);
+      save();
+    });
+  }
+}
+
 /* ============================================================
    LINGUA + MOTORE DI RICERCA
    ============================================================ */
@@ -558,13 +579,21 @@ function renderSearchEngine() {
 let searchToggleBound = false;
 function renderSearchToggle() {
   el("showSearchToggle").checked = settings.showSearch !== false;
+  applySearchEngineState();
   if (!searchToggleBound) {
     searchToggleBound = true;
     el("showSearchToggle").addEventListener("change", (e) => {
       settings.showSearch = e.target.checked;
+      applySearchEngineState();
       save();
     });
   }
+}
+// il motore di ricerca serve solo se la barra è visibile: barra nascosta → disabilitato e attenuato
+function applySearchEngineState() {
+  const on = settings.showSearch !== false;
+  el("searchEngine").disabled = !on;
+  el("searchEngineRow").classList.toggle("dimmed", !on);
 }
 
 /* ============================================================
@@ -972,15 +1001,37 @@ function renderCtActive() {
     : `<div class="empty">${esc(t("ct_empty"))}</div>`;
 }
 
-async function onCtStart() {
+// durata leggibile per il riepilogo: "2 giorni, 3 ore" (componenti a zero omessi)
+function ctDurationLabel(hours, days) {
+  const parts = [];
+  if (days > 0) parts.push(days + " " + t("ct_days"));
+  if (hours > 0) parts.push(hours + " " + t("ct_hours"));
+  return parts.join(", ");
+}
+
+let ctPending = null; // blocco in attesa della conferma esplicita nel dialog
+function onCtStart() {
   const sel = el("ctTarget").value;
   const hours = Number(el("ctHours").value) || 0;
   const days = Number(el("ctDays").value) || 0;
   el("ctMsg").textContent = "";
   if (!sel) return;
   if (hours <= 0 && days <= 0) { el("ctMsg").textContent = t("ct_invalid"); return; }
-  const [kind, id] = splitTarget(sel);
-  const resp = await sendMessage({ type: "coldTurkey", kind, id, hours, days });
+  const target = findTarget(sel);
+  if (!target) return;
+  // sicurezza: il blocco è irreversibile, quindi prima di partire chiediamo conferma
+  // spiegando per bene cosa si sta per fare.
+  ctPending = { kind: target.kind, id: target.id, hours, days };
+  el("ctConfirmBody").textContent = t("ct_confirm_body", { label: target.label, dur: ctDurationLabel(hours, days) });
+  el("ctConfirm").showModal();
+}
+
+async function onCtConfirm() {
+  const p = ctPending;
+  el("ctConfirm").close();
+  ctPending = null;
+  if (!p) return;
+  const resp = await sendMessage({ type: "coldTurkey", kind: p.kind, id: p.id, hours: p.hours, days: p.days });
   await applyProResponse(resp, "ctMsg");
 }
 

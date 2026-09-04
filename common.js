@@ -58,6 +58,7 @@ const DEFAULT_SETTINGS = {
   fontFamily: "sans",        // sans | serif | mono | cursive
   bgImage: "",               // URL di un'immagine di sfondo ("" = nessuna)
   borderRadius: 8,            // arrotondamento dei bordi dell'interfaccia in px (0 – 24)
+  cardHover: true,            // animazioni hover sulle card (sollevamento/ingrandimento + alone)
   showSeconds: false,
   lang: "auto",              // lingua dell'interfaccia: "auto" (browser) o codice da LANGUAGES
   pinHash: null,              // SHA-256 del PIN di blocco impostazioni (null = nessun PIN)
@@ -339,6 +340,10 @@ function applyTheme(root, settings, allowProTheme) {
   root.style.fontFamily = family;
   root.style.fontSize = (16 * (settings.fontScale || 1)) + "px";
   root.style.colorScheme = c.light ? "light" : "dark"; // controlli nativi coerenti col tema
+
+  // animazioni hover sulle card: il toggle (Aspetto → Avanzate) aggiunge/rimuove
+  // la classe no-hover su <body>; ogni pagina la riapplica via applyTheme.
+  if (document.body) document.body.classList.toggle("no-hover", settings.cardHover === false);
 }
 
 /* ============================================================

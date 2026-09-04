@@ -644,6 +644,7 @@ function sanitizeSettings(s) {
   out.fontFamily = ["sans", "serif", "mono", "cursive"].includes(out.fontFamily) ? out.fontFamily : "sans";
   out.searchEngine = SEARCH_ENGINES[out.searchEngine] ? out.searchEngine : "google";
   out.showSearch = out.showSearch !== false;
+  out.cardHover = out.cardHover !== false;   // animazioni hover sulle card (Aspetto → Avanzate)
 
   // personalizzazione avanzata (immagine di sfondo + arrotondamento bordi)
   out.bgImage = typeof out.bgImage === "string" ? out.bgImage.trim().slice(0, 2048) : "";

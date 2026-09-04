@@ -220,8 +220,15 @@ button.danger-btn { color: #ff8a80; border-color: #ff8a80; background: none; }
   cursor: pointer;
   background: var(--card);
   text-align: left;
+  /* ogni sottotema è una card a sé: al passaggio si ingrandisce (disattivabile) */
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.22s ease, border-color 0.2s ease;
 }
-.theme-card:hover { border-color: var(--accent); }
+body:not(.no-hover) .theme-card:hover {
+  transform: scale(1.06);
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.55);
+}
+body.no-hover .theme-card { transition: none; }
 .theme-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .theme-card .t-name { font-size: 0.85rem; margin-bottom: 8px; }
 .theme-card.custom .t-name { padding-right: 14px; }
@@ -249,6 +256,7 @@ button.danger-btn { color: #ff8a80; border-color: #ff8a80; background: none; }
   border-style: dashed;
   background: transparent;
 }
+
 .theme-card.new .t-name { font-size: 1.5rem; font-weight: 200; line-height: 1; margin: 0 0 4px; }
 .theme-card.new .t-new-label { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
 
@@ -276,6 +284,40 @@ button.danger-btn { color: #ff8a80; border-color: #ff8a80; background: none; }
 
 .check-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; cursor: pointer; }
 .check-row input { accent-color: var(--accent); width: 16px; height: 16px; }
+/* check-row che segue dei campi (es. animazioni hover dentro Avanzate) */
+.card-hover-row { margin-top: 14px; }
+/* motore di ricerca: attenuato quando la barra è nascosta (senza barra non serve) */
+.search-engine-row.dimmed { opacity: 0.45; }
+
+/* ---------- dialog di conferma (es. blocco ferreo) ---------- */
+dialog.ct-confirm {
+  margin: auto; /* il reset globale * { margin: 0 } azzera il margin:auto UA che centra il modal */
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 6px);
+  padding: 22px 24px;
+  width: min(420px, calc(100vw - 40px));
+}
+dialog.ct-confirm::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog.ct-confirm h3 { margin-bottom: 10px; }
+.ct-confirm-body { font-size: 0.95rem; }
+.ct-confirm-warn {
+  margin-top: 12px;
+  padding: 10px 12px;
+  color: var(--fg);
+  border: 1px solid color-mix(in srgb, #ff8a80 45%, transparent);
+  border-radius: var(--border-radius, 8px);
+  background: color-mix(in srgb, #ff8a80 10%, transparent);
+}
+.ct-confirm .d-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+#ctConfirmOk {
+  background: #ff5c4d;
+  border-color: #ff5c4d;
+  color: #fff;
+  font-weight: 600;
+}
+#ctConfirmOk:hover { filter: brightness(1.1); color: #fff; }
 
 /* ---------- personalizzazione avanzata ---------- */
 #bgImage { flex: 1; }
@@ -400,25 +442,33 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 /* ============================================================
    Card PRO premium
    ============================================================ */
-#proCard {
-  position: relative;
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--card), var(--card)) padding-box,
-    linear-gradient(135deg, rgba(181, 123, 255, 0.85), rgba(79, 195, 247, 0.85), rgba(245, 199, 106, 0.7), rgba(181, 123, 255, 0.85)) border-box;
-  /* il gradiente del bordo è più largo del bordo stesso e scorre piano ("leggermente animato") */
-  background-size: auto, 250% 250%;
-  animation: proCardGlow 9s ease-in-out infinite;
+/* il bordo della card PRO è un gradiente conico che RUOTA in continuazione:
+   l'effetto premium del gradiente animato attorno alla card */
+@property --pro-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
 }
 
-@keyframes proCardGlow {
-  0%   { background-position: 0 0, 0% 50%; }
-  50%  { background-position: 0 0, 100% 50%; }
-  100% { background-position: 0 0, 0% 50%; }
+#proCard {
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    conic-gradient(from var(--pro-angle, 0deg),
+      rgba(181, 123, 255, 0.95), rgba(111, 227, 193, 0.9), rgba(79, 195, 247, 0.95),
+      rgba(245, 199, 106, 0.85), rgba(181, 123, 255, 0.95)) border-box;
+  animation: proCardSpin 5s linear infinite;
+}
+
+@keyframes proCardSpin {
+  to { --pro-angle: 360deg; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #proCard { animation: none; }
+  #proCard, .theme-card.pro { animation: none; }
+  .theme-card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
+  body:not(.no-hover) .theme-card:hover { transform: none; }
 }
 .pro-head { display: flex; align-items: center; gap: 12px; margin-bottom: 2px; }
 .pro-badge {
@@ -511,9 +561,15 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 .pro-theme-hint { color: var(--muted); font-size: 0.78rem; margin: 0 0 10px; }
 
 #proThemeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+/* anche i temi PRO hanno il bordo a gradiente conico animato (come la card PRO) */
 .theme-card.pro {
-  background: var(--card);
-  border: 1px solid var(--border);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    conic-gradient(from var(--pro-angle, 0deg),
+      rgba(181, 123, 255, 0.95), rgba(111, 227, 193, 0.9), rgba(79, 195, 247, 0.95),
+      rgba(245, 199, 106, 0.85), rgba(181, 123, 255, 0.95)) border-box;
+  animation: proCardSpin 5s linear infinite;
 }
 .theme-card.pro .t-grad {
   height: 44px;

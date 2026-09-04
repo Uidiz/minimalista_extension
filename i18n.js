@@ -160,6 +160,7 @@ it: {
   language_auto: "Automatico (lingua del browser)",
 
   // personalizzazione avanzata
+  card_hover: "Anima le card al passaggio del mouse",
   advanced_title: "Avanzate",
   bg_image: "Immagine di sfondo (URL)",
   bg_image_ph: "https://…",
@@ -218,6 +219,10 @@ it: {
   ct_active_title: "Blocchi ferrei attivi",
   ct_empty: "Nessun blocco ferreo attivo.",
   ct_invalid: "Scegli una durata maggiore di zero.",
+  ct_confirm_title: "Confermi il blocco ferreo?",
+  ct_confirm_body: "Stai per attivare un blocco ferreo su {label} per {dur}.",
+  ct_confirm_warn: "Il blocco è <strong>totale e irreversibile</strong>: il sito non si aprirà per tutta la durata, anche con la Modalità Focus spenta o inserendo il PIN. <strong>Non potrai annullarlo né ridurlo</strong> prima della scadenza.",
+  ct_confirm_ok: "Sì, attiva il blocco",
   sched_title: "Fasce orarie",
   sched_hint: "Il blocco del sito o della categoria è attivo solo nelle fasce scelte (es. lun–ven 09:00–18:00). Fuori fascia nessun blocco.",
   sched_from: "dalle",
@@ -387,6 +392,7 @@ en: {
   language_auto: "Automatic (browser language)",
 
   // advanced customization
+  card_hover: "Animate cards on hover",
   advanced_title: "Advanced",
   bg_image: "Background image (URL)",
   bg_image_ph: "https://…",
@@ -445,6 +451,10 @@ en: {
   ct_active_title: "Active cold turkey blocks",
   ct_empty: "No active cold turkey block.",
   ct_invalid: "Choose a duration greater than zero.",
+  ct_confirm_title: "Confirm the hard block?",
+  ct_confirm_body: "You're about to enable a hard block on {label} for {dur}.",
+  ct_confirm_warn: "The block is <strong>total and irreversible</strong>: the site won't open for its whole duration, even with Focus mode off or with the PIN. <strong>You won't be able to cancel or shorten it</strong> before it expires.",
+  ct_confirm_ok: "Yes, start the block",
   sched_title: "Time slots",
   sched_hint: "The block of the site or category is active only in the chosen slots (e.g. Mon–Fri 09:00–18:00). Outside the slots there is no block.",
   sched_from: "from",
@@ -610,6 +620,7 @@ es: {
   language_auto: "Automático (idioma del navegador)",
 
   // personalización avanzada
+  card_hover: "Animar las tarjetas al pasar el cursor",
   advanced_title: "Avanzado",
   bg_image: "Imagen de fondo (URL)",
   bg_image_ph: "https://…",
@@ -668,6 +679,10 @@ es: {
   ct_active_title: "Bloqueos cold turkey activos",
   ct_empty: "No hay ningún bloqueo cold turkey activo.",
   ct_invalid: "Elige una duración mayor que cero.",
+  ct_confirm_title: "¿Confirmas el bloqueo total?",
+  ct_confirm_body: "Estás a punto de activar un bloqueo total en {label} durante {dur}.",
+  ct_confirm_warn: "El bloqueo es <strong>total e irreversible</strong>: el sitio no se abrirá durante toda la duración, incluso con el modo Focus apagado o con el PIN. <strong>No podrás cancelarlo ni reducirlo</strong> antes de que expire.",
+  ct_confirm_ok: "Sí, activar el bloqueo",
   sched_title: "Franjas horarias",
   sched_hint: "El bloqueo del sitio o categoría está activo solo en las franjas elegidas (p. ej. lun–vie 09:00–18:00). Fuera de la franja no hay bloqueo.",
   sched_from: "de",
@@ -833,6 +848,7 @@ fr: {
   language_auto: "Automatique (langue du navigateur)",
 
   // personnalisation avancée
+  card_hover: "Animer les cartes au survol",
   advanced_title: "Avancé",
   bg_image: "Image de fond (URL)",
   bg_image_ph: "https://…",
@@ -891,6 +907,10 @@ fr: {
   ct_active_title: "Blocages cold turkey actifs",
   ct_empty: "Aucun blocage cold turkey actif.",
   ct_invalid: "Choisissez une durée supérieure à zéro.",
+  ct_confirm_title: "Confirmer le blocage total ?",
+  ct_confirm_body: "Vous allez activer un blocage total sur {label} pendant {dur}.",
+  ct_confirm_warn: "Le blocage est <strong>total et irréversible</strong> : le site ne s'ouvrira pas pendant toute la durée, même avec le mode Focus désactivé ou avec le code PIN. <strong>Vous ne pourrez ni l'annuler ni le réduire</strong> avant son expiration.",
+  ct_confirm_ok: "Oui, démarrer le blocage",
   sched_title: "Créneaux horaires",
   sched_hint: "Le blocage du site ou de la catégorie n'est actif que dans les créneaux choisis (ex. lun–ven 09:00–18:00). Hors créneau, aucun blocage.",
   sched_from: "de",
@@ -1056,6 +1076,7 @@ de: {
   language_auto: "Automatisch (Browsersprache)",
 
   // erweiterte Personalisierung
+  card_hover: "Karten beim Überfahren animieren",
   advanced_title: "Erweitert",
   bg_image: "Hintergrundbild (URL)",
   bg_image_ph: "https://…",
@@ -1114,6 +1135,10 @@ de: {
   ct_active_title: "Aktive Cold-Turkey-Sperren",
   ct_empty: "Keine aktive Cold-Turkey-Sperre.",
   ct_invalid: "Wähle eine Dauer größer als null.",
+  ct_confirm_title: "Sperre wirklich starten?",
+  ct_confirm_body: "Du bist dabei, eine totale Sperre für {label} zu aktivieren, Dauer: {dur}.",
+  ct_confirm_warn: "Die Sperre ist <strong>total und unumkehrbar</strong>: Die Website wird während der gesamten Dauer nicht geöffnet – auch nicht bei deaktiviertem Fokus-Modus oder mit der PIN. <strong>Du kannst sie vor Ablauf weder abbrechen noch verkürzen</strong>.",
+  ct_confirm_ok: "Ja, Sperre starten",
   sched_title: "Zeitfenster",
   sched_hint: "Der Block der Website oder Kategorie ist nur in den gewählten Zeitfenstern aktiv (z. B. Mo–Fr 09:00–18:00). Außerhalb des Fensters gibt es keinen Block.",
   sched_from: "von",
@@ -1279,6 +1304,7 @@ pt: {
   language_auto: "Automático (idioma do navegador)",
 
   // personalização avançada
+  card_hover: "Animar os cartões ao passar o rato",
   advanced_title: "Avançado",
   bg_image: "Imagem de fundo (URL)",
   bg_image_ph: "https://…",
@@ -1337,6 +1363,10 @@ pt: {
   ct_active_title: "Bloqueios cold turkey ativos",
   ct_empty: "Nenhum bloqueio cold turkey ativo.",
   ct_invalid: "Escolha uma duração maior que zero.",
+  ct_confirm_title: "Confirma o bloqueio total?",
+  ct_confirm_body: "Está prestes a ativar um bloqueio total em {label} durante {dur}.",
+  ct_confirm_warn: "O bloqueio é <strong>total e irreversível</strong>: o site não abrirá durante toda a duração, mesmo com o modo Focus desativado ou com o PIN. <strong>Não poderá cancelá-lo nem reduzi-lo</strong> antes de expirar.",
+  ct_confirm_ok: "Sim, ativar o bloqueio",
   sched_title: "Intervalos horários",
   sched_hint: "O bloqueio do site ou da categoria só está ativo nos intervalos escolhidos (ex. seg–sex 09:00–18:00). Fora do intervalo não há bloqueio.",
   sched_from: "das",

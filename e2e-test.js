@@ -993,6 +993,16 @@ async function main() {
       const before = Date.now();
       let err = null;
       try { await onCtStart(); } catch (e) { err = String((e && e.message) || e); }
+      // il blocco chiede conferma esplicita: il dialog deve aprirsi con il riepilogo
+      const dlg = document.getElementById("ctConfirm");
+      if (!dlg || !dlg.open || !document.getElementById("ctConfirmBody").textContent) return null;
+      document.getElementById("ctConfirmOk").click(); // conferma: parte il messaggio coldTurkey
+      for (let i = 0; i < 15; i++) { // attende l'esito (messaggio asincrono al background)
+        await new Promise(r2 => setTimeout(r2, 200));
+        const s2 = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
+        const site2 = s2.sites.find(x => String(x.id) === "1");
+        if (site2 && site2.ctUntil > before) return { until: site2.ctUntil };
+      }
       const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
       const site = s.sites.find(x => String(x.id) === "1");
       return site && site.ctUntil > before
