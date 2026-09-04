@@ -132,6 +132,8 @@ function renderAll() {
   renderLang();
   renderSearchEngine();
   renderSearchToggle();
+  renderHomeSectionsToggles();
+  renderBgMotion();
   renderDev();
   renderStats();
   el("focusToggle").checked = settings.focusEnabled;
@@ -144,7 +146,7 @@ function renderSites() {
   rows.innerHTML = settings.sites.map(s => {
     const inCt = (s.ctUntil || 0) > now;
     const chips =
-      (inCt ? `<span class="chip ct-chip" data-until="${s.ctUntil}">⛓ ${esc(ctRemainingLabel(s.ctUntil))}</span>` : "") +
+      (inCt ? `<span class="chip ct-chip" data-until="${s.ctUntil}">🔒 ${esc(ctRemainingLabel(s.ctUntil))}</span>` : "") +
       (s.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(s.schedule))}">🕒</span>` : "");
     const dis = inCt ? " disabled" : "";
     return `
@@ -575,6 +577,31 @@ function applySearchEngineState() {
 }
 
 /* ============================================================
+   HOME — sezioni della nuova scheda visibili/nascoste
+   ============================================================ */
+let homeTogglesBound = false;
+function renderHomeSectionsToggles() {
+  el("showTodoToggle").checked = settings.showTodo !== false;
+  el("showFavToggle").checked = settings.showFavorites !== false;
+  el("showFocusToggle").checked = settings.showFocus !== false;
+  if (homeTogglesBound) return;
+  homeTogglesBound = true;
+  el("showTodoToggle").addEventListener("change", (e) => { settings.showTodo = e.target.checked; save(); });
+  el("showFavToggle").addEventListener("change", (e) => { settings.showFavorites = e.target.checked; save(); });
+  el("showFocusToggle").addEventListener("change", (e) => { settings.showFocus = e.target.checked; save(); });
+}
+
+/* modalità dello sfondo dei temi PRO (aurora animata / bagliore statico / solo gradiente) */
+let bgMotionBound = false;
+function renderBgMotion() {
+  const sel = el("bgMotionSelect");
+  sel.value = ["aurora", "static", "plain"].includes(settings.bgMotion) ? settings.bgMotion : "aurora";
+  if (bgMotionBound) return;
+  bgMotionBound = true;
+  sel.addEventListener("change", (e) => { settings.bgMotion = e.target.value; save(); });
+}
+
+/* ============================================================
    STATISTICHE
    ============================================================ */
 let stats = null;
@@ -716,7 +743,7 @@ function renderCategories() {
     const name = esc(t(reg.labelKey));
     const doms = categoryDomains(settings, reg.id);
     const chips =
-      (inCt ? `<span class="chip ct-chip" data-until="${conf.ctUntil}">⛓ ${esc(ctRemainingLabel(conf.ctUntil))}</span>` : "") +
+      (inCt ? `<span class="chip ct-chip" data-until="${conf.ctUntil}">🔒 ${esc(ctRemainingLabel(conf.ctUntil))}</span>` : "") +
       (conf.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(conf.schedule))}">🕒</span>` : "");
     const list = ui.open ? `
       <div class="cat-domain-list">
@@ -887,7 +914,81 @@ function renderPro() {
     renderSchedEditor();
     renderSchedList();
   }
-  renderProThemes(); // aggiorna i lucchetti delle card tema PRO allo stato attuale
+  renderProThemes();  // aggiorna i lucchetti delle card tema PRO allo stato attuale
+  renderShortcuts();  // e il blocco/abilitazione dei collegamenti rapidi
+  // la card "Sfondo dei temi PRO" ha senso solo con un tema PRO applicabile
+  el("bgMotionCard").hidden = !unlocked;
+}
+
+/* ============================================================
+   COLLEGAMENTI RAPIDI (PRO) — Aspetto → riga in alto a destra
+   ============================================================ */
+let shortcutsBound = false;
+function renderShortcuts() {
+  const unlocked = isPro(settings);
+  el("shortcutsLocked").hidden = unlocked;
+  el("shortcutsBody").hidden = !unlocked;
+  if (!unlocked) return;
+
+  const list = settings.shortcuts || [];
+  const rows = el("shortcutRows");
+  if (!list.length) {
+    rows.innerHTML = `<div class="empty">${esc(t("shortcuts_empty"))}</div>`;
+  } else {
+    rows.innerHTML = list.map(s => `
+      <div class="shortcut-row" data-id="${esc(String(s.id))}">
+        <span class="shortcut-name">${esc(shortcutLabel(s))}</span>
+        <span class="shortcut-url">${esc(s.url)}</span>
+        <button type="button" class="shortcut-del" title="${esc(t("remove_aria"))}" aria-label="${esc(t("remove_aria"))}">✕</button>
+      </div>`).join("");
+    rows.querySelectorAll(".shortcut-del").forEach(btn => {
+      btn.addEventListener("click", () => {
+        settings.shortcuts = (settings.shortcuts || []).filter(s => String(s.id) !== btn.parentElement.dataset.id);
+        renderShortcuts();
+        save();
+      });
+    });
+  }
+
+  // i preset già scelti spariscono dalla fila dei suggeriti
+  const chosen = new Set(list.map(s => s.preset).filter(Boolean));
+  el("shortcutPresets").innerHTML = SHORTCUT_PRESETS.filter(p => !chosen.has(p.id))
+    .map(p => `<button type="button" class="chip shortcut-add" data-preset="${p.id}">+ ${esc(t(p.labelKey))}</button>`)
+    .join("");
+  el("shortcutPresets").querySelectorAll(".shortcut-add").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const p = SHORTCUT_PRESETS.find(x => x.id === btn.dataset.preset);
+      if (!p) return;
+      settings.shortcuts = [...(settings.shortcuts || []), { id: Date.now() + Math.random(), preset: p.id, name: "", url: p.url }];
+      renderShortcuts();
+      save();
+    });
+  });
+
+  if (shortcutsBound) return;
+  shortcutsBound = true;
+  el("shortcutAdd").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = el("shortcutName").value.trim();
+    const url = el("shortcutUrl").value.trim();
+    if (!name || !/^https?:\/\//i.test(url)) return;
+    settings.shortcuts = [...(settings.shortcuts || []), { id: Date.now() + Math.random(), preset: null, name, url }];
+    el("shortcutName").value = "";
+    el("shortcutUrl").value = "";
+    renderShortcuts();
+    save();
+  });
+  el("shortcutsUnlock").addEventListener("click", () => {
+    // porta l'utente alla card di pagamento PRO (sezione Focus) e la evidenzia
+    switchSection("focus");
+    const card = el("proCard");
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("pro-pulse");
+      setTimeout(() => card.classList.remove("pro-pulse"), 1600);
+    }
+    onProUnlock();
+  });
 }
 
 function splitTarget(v) {
@@ -926,8 +1027,8 @@ function renderCtActive() {
   }
   el("ctActive").innerHTML = items.length
     ? items.map(it =>
-      `<div class="pro-item"><span class="pro-label">⛓ ${esc(it.label)}</span>` +
-      `<span class="chip ct-chip" data-until="${it.until}">⛓ ${esc(ctRemainingLabel(it.until))}</span></div>`).join("")
+      `<div class="pro-item"><span class="pro-label">🔒 ${esc(it.label)}</span>` +
+      `<span class="chip ct-chip" data-until="${it.until}">🔒 ${esc(ctRemainingLabel(it.until))}</span></div>`).join("")
     : `<div class="empty">${esc(t("ct_empty"))}</div>`;
 }
 
@@ -1159,7 +1260,7 @@ setInterval(() => {
   }
   document.querySelectorAll(".ct-chip").forEach(ch => {
     const u = Number(ch.dataset.until || 0);
-    if (u > now) ch.textContent = "⛓ " + ctRemainingLabel(u);
+    if (u > now) ch.textContent = "🔒 " + ctRemainingLabel(u);
   });
   if (expired) {
     renderSites();

@@ -10,6 +10,8 @@ body {
 }
 
 .phone {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 460px;
 }
@@ -179,30 +181,94 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
 .d-row label { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; color: var(--muted); }
 .d-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
-/* ---------- preferiti ---------- */
-#favList { display: flex; flex-wrap: wrap; gap: 10px; }
+/* ---------- preferiti (griglia launcher: icona del sito + nome sotto) ---------- */
+#favList { display: flex; flex-wrap: wrap; gap: 16px 18px; }
 
-.fav-item {
+.fav-item { position: relative; width: 74px; }
+.fav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: var(--fg);
+  width: 100%;
+}
+a.fav-link:hover { color: var(--accent); text-decoration: none; }
+
+.fav-ico {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 10px);
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+a.fav-link:hover .fav-ico { transform: translateY(-2px); border-color: var(--accent); }
+
+/* iniziale del nome come fallback quando l'icona del sito non è disponibile */
+.fav-ico::before {
+  content: attr(data-letter);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--muted);
+  display: none;
+}
+.fav-item.no-favicon .fav-ico::before { display: flex; }
+.fav-item.no-favicon .fav-favicon { display: none; }
+
+.fav-favicon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.fav-item .fav-name {
+  font-size: 0.74rem;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* in modalità modifica: ✕ in alto a destra sulla tile, il link è disattivato */
+.fav-item .fav-x {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 7px 16px;
-  font-size: 0.92rem;
-}
-.fav-item a { color: var(--fg); }
-.fav-item a:hover { color: var(--accent); text-decoration: none; }
-.fav-item .fav-x {
-  background: none;
-  border: none;
   color: var(--muted);
-  padding: 0 2px 0 8px;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.fav-item .fav-x:hover { color: #ff8a80; }
+.fav-item .fav-x:hover { color: #ff8a80; border-color: #ff8a80; }
 
-#favAdd { display: flex; gap: 8px; margin-top: 12px; }
-#favAdd input:first-child { flex: 1; }
-#favAdd input:nth-child(2) { flex: 1.6; }
+#favAdd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+#favAdd input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+#favAdd button { flex: 0 0 auto; white-space: nowrap; }
 
 /* ---------- focus ---------- */
 #focusSites { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -221,6 +287,114 @@ dialog form { display: flex; flex-direction: column; gap: 12px; }
 
 #todayStats { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
 #todayStats strong { color: var(--fg); font-weight: 500; }
+
+/* ---------- collegamenti rapidi (PRO) ---------- */
+/* riga di link in alto a destra, come i link Gmail/Immagini della home di Google:
+   si apre la destinazione in una nuova scheda, la dashboard resta dov'è */
+.quick-links {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  z-index: 10;
+}
+.quick-links a {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.quick-links a:hover { color: var(--accent); text-decoration: none; }
+
+/* ---------- temi PRO: aurora animata + effetto vetro sulla home ---------- */
+/* Con un tema PRO (html.theme-grad) lo sfondo vive: tre blob sfocati e luminosi
+   (accento, secondo colore del gradiente e un bagliore caldo centrale) che
+   derivano lentamente incrociandosi sopra il gradiente. Il movimento è ampio
+   e continuo, così la deriva si nota subito, restando però lenta ed elegante.
+   Trasform/opacità soltanto, quindi l'animazione resta sul compositor. */
+html.theme-grad .bg-aurora { display: block; }
+.bg-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: none;
+}
+.bg-aurora .blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  mix-blend-mode: screen;
+  /* nessun filter: blur qui — su layer da ~70vmax la sfocatura GPU è il costo
+     principale dell'animazione. I radial-gradient degradano già fino a
+     trasparente, quindi i blob restano morbidi senza blur. */
+}
+.bg-aurora .blob-a {
+  width: 78vmax;
+  height: 78vmax;
+  left: -30vmax;
+  top: -34vmax;
+  opacity: 0.95;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent, #9db8ff) 80%, transparent), transparent 64%);
+  animation: aurora-a 12s ease-in-out infinite alternate;
+}
+.bg-aurora .blob-b {
+  width: 68vmax;
+  height: 68vmax;
+  right: -28vmax;
+  bottom: -32vmax;
+  opacity: 0.9;
+  background: radial-gradient(circle, color-mix(in srgb, var(--bg-grad-c2, var(--accent, #9db8ff)) 75%, transparent), transparent 64%);
+  animation: aurora-b 17s ease-in-out infinite alternate;
+}
+.bg-aurora .blob-c {
+  width: 44vmax;
+  height: 44vmax;
+  left: 30%;
+  top: 22%;
+  opacity: 0.55;
+  background: radial-gradient(circle, color-mix(in srgb, #f5c76a 60%, transparent), transparent 66%);
+  animation: aurora-c 22s ease-in-out infinite alternate;
+}
+@keyframes aurora-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(26vmax, 18vmax, 0) scale(1.4); }
+}
+@keyframes aurora-b {
+  from { transform: translate3d(0, 0, 0) scale(1.18); }
+  to   { transform: translate3d(-22vmax, -16vmax, 0) scale(0.88); }
+}
+@keyframes aurora-c {
+  from { transform: translate3d(-12vmax, -10vmax, 0) scale(0.92); }
+  to   { transform: translate3d(14vmax, 12vmax, 0) scale(1.28); }
+}
+/* Modalità di sfondo PRO (Impostazioni → Home → Sfondo dei temi PRO):
+   - default/assente = aurora animata;
+   - static = bagliori fermi (zero costo per frame, look premium invariato);
+   - plain = solo il gradiente del tema, niente blob. */
+html.theme-grad[data-bg-motion="static"] .bg-aurora .blob { animation: none; }
+html.theme-grad[data-bg-motion="plain"] .bg-aurora { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-aurora .blob { animation: none; }
+}
+
+/* Con un tema PRO (html.theme-grad) le card diventano vetro satinato: semi-
+   trasparenti e con sfocatura, lasciano trasparire il gradiente di sfondo. */
+html.theme-grad .card {
+  background: color-mix(in srgb, var(--card) 74%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  backdrop-filter: blur(18px) saturate(1.35);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+}
+html.theme-grad #status {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
 
 /* ---------- footer ---------- */
 footer { text-align: center; margin-top: 8px; font-size: 0.85rem; }

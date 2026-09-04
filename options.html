@@ -15,6 +15,7 @@
         <button data-sec="focus" class="active" data-i18n="nav_focus">Focus</button>
         <button data-sec="stats" data-i18n="nav_stats">Statistiche</button>
         <button data-sec="appearance" data-i18n="nav_appearance">Aspetto</button>
+        <button data-sec="home" data-i18n="nav_home">Home</button>
         <button data-sec="info" data-i18n="nav_info">Info</button>
       </nav>
       <a href="dashboard.html" class="back-link" data-i18n="back_link">← Nuova scheda</a>
@@ -67,7 +68,7 @@
           <div id="proLocked">
             <ul class="pro-features">
               <li>
-                <span class="pf-ico">⛓</span>
+                <span class="pf-ico">🔒</span>
                 <span><span class="pf-name" data-i18n="ct_title">Blocco ferreo</span><br><span class="pf-desc" data-i18n="pro_feat_ct_d">Siti o categorie bloccati per ore/giorni, senza possibilità di override.</span></span>
               </li>
               <li>
@@ -96,7 +97,7 @@
               <!-- Blocco ferreo (Cold Turkey) -->
               <div class="pro-tool">
                 <div class="pro-tool-head">
-                  <span class="pro-tool-ico">⛓</span>
+                  <span class="pro-tool-ico">🔒</span>
                   <div class="pro-tool-title">
                     <h3 data-i18n="ct_title">Blocco ferreo</h3>
                     <p class="hint" data-i18n="ct_hint">Blocco totale e irreversibile del target scelto per le ore/giorni indicati: non si può disattivare né aggirare finché non scade.</p>
@@ -281,28 +282,6 @@
         </div>
 
         <div class="card">
-          <h2 data-i18n="clock">Orologio</h2>
-          <label class="check-row">
-            <input type="checkbox" id="showSeconds">
-            <span data-i18n="show_seconds">Mostra i secondi sulla nuova scheda</span>
-          </label>
-        </div>
-
-        <div class="card">
-          <h2 data-i18n="new_tab">Nuova scheda</h2>
-          <label class="check-row">
-            <input type="checkbox" id="showSearchToggle">
-            <span data-i18n="show_search">Mostra la barra di ricerca web sulla nuova scheda</span>
-          </label>
-          <!-- il motore di ricerca serve solo se la barra è visibile: stessa card,
-               e viene disabilitato/attenuato quando la barra è nascosta -->
-          <div class="inline-field search-engine-row" id="searchEngineRow">
-            <label for="searchEngine" data-i18n="search_engine">Motore di ricerca</label>
-            <select id="searchEngine" aria-label="Motore di ricerca" data-i18n-aria="search_engine"></select>
-          </div>
-        </div>
-
-        <div class="card">
           <h2 data-i18n="advanced_title">Avanzate</h2>
           <div class="inline-field">
             <label for="bgImage" data-i18n="bg_image">Immagine di sfondo (URL)</label>
@@ -318,6 +297,96 @@
             <input type="checkbox" id="cardHoverToggle">
             <span data-i18n="card_hover">Anima le card al passaggio del mouse</span>
           </label>
+        </div>
+      </section>
+
+      <!-- ================= HOME (pagina principale) ================= -->
+      <section id="sec-home" hidden>
+        <div class="card">
+          <h2 data-i18n="home_sections">Sezioni della nuova scheda</h2>
+          <div class="section-toggles">
+            <label class="sec-toggle">
+              <span class="sec-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+              </span>
+              <span class="sec-name" data-i18n="home_show_search">Barra di ricerca web</span>
+              <span class="switch"><input type="checkbox" id="showSearchToggle"><span class="slider"></span></span>
+            </label>
+            <label class="sec-toggle">
+              <span class="sec-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="4.5" width="15" height="15" rx="3"/><path d="M9 12.2l2.1 2.1 4.2-4.4"/></svg>
+              </span>
+              <span class="sec-name" data-i18n="home_show_todo">Card ToDo</span>
+              <span class="switch"><input type="checkbox" id="showTodoToggle"><span class="slider"></span></span>
+            </label>
+            <label class="sec-toggle">
+              <span class="sec-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z"/></svg>
+              </span>
+              <span class="sec-name" data-i18n="home_show_fav">Card Preferiti</span>
+              <span class="switch"><input type="checkbox" id="showFavToggle"><span class="slider"></span></span>
+            </label>
+            <label class="sec-toggle">
+              <span class="sec-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.4"/><path d="M12 1.5V5M12 19v3.5M1.5 12H5M19 12h3.5"/></svg>
+              </span>
+              <span class="sec-name" data-i18n="home_show_focus">Card Focus</span>
+              <span class="switch"><input type="checkbox" id="showFocusToggle"><span class="slider"></span></span>
+            </label>
+          </div>
+          <p class="hint" style="margin-top:12px" data-i18n="home_sections_hint">Nascondere una sezione non disattiva nulla: il Focus continua a bloccare i siti e le attività restano salvate.</p>
+          <!-- il motore di ricerca serve solo se la barra è visibile: viene
+               disabilitato/attenuato quando la barra è nascosta -->
+          <div class="inline-field search-engine-row" id="searchEngineRow" style="margin-top:14px">
+            <label for="searchEngine" data-i18n="search_engine">Motore di ricerca</label>
+            <select id="searchEngine" aria-label="Motore di ricerca" data-i18n-aria="search_engine"></select>
+          </div>
+        </div>
+
+        <div class="card" id="bgMotionCard">
+          <h2 data-i18n="bg_motion_title">Sfondo dei temi PRO</h2>
+          <p class="hint" data-i18n="bg_motion_hint">L'aurora animata è leggera (solo transform, senza sfocature), ma se preferisci il massimo della fluidità puoi passare a un bagliore statico o al solo gradiente.</p>
+          <div class="inline-field" style="margin-top:12px">
+            <label for="bgMotionSelect" data-i18n="bg_motion_label">Animazione di sfondo</label>
+            <select id="bgMotionSelect" aria-label="Animazione di sfondo" data-i18n-aria="bg_motion_label">
+              <option value="aurora" data-i18n="bg_motion_aurora">Aurora animata</option>
+              <option value="static" data-i18n="bg_motion_static">Bagliore statico</option>
+              <option value="plain" data-i18n="bg_motion_plain">Solo gradiente</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 data-i18n="clock">Orologio</h2>
+          <label class="check-row">
+            <input type="checkbox" id="showSeconds">
+            <span data-i18n="show_seconds">Mostra i secondi sulla nuova scheda</span>
+          </label>
+        </div>
+
+        <div class="card" id="shortcutsCard">
+          <div class="row" style="align-items:flex-start">
+            <div>
+              <h2 data-i18n="shortcuts_title">Collegamenti rapidi</h2>
+              <p class="hint" data-i18n="shortcuts_hint">Scegli i collegamenti mostrati in alto a destra della nuova scheda, come i link Gmail e Immagini della home di Google.</p>
+            </div>
+            <span class="pro-badge">PRO</span>
+          </div>
+          <div id="shortcutsLocked" hidden>
+            <p class="hint" style="margin:12px 0" data-i18n="shortcuts_locked">I collegamenti rapidi in alto a destra nella nuova scheda sono una funzione PRO.</p>
+            <button type="button" id="shortcutsUnlock" class="btn-pro" data-i18n="pro_unlock">Sblocca PRO (Lifetime)</button>
+          </div>
+          <div id="shortcutsBody" hidden>
+            <div id="shortcutRows"></div>
+            <p class="hint" id="shortcutsMsg"></p>
+            <div class="shortcut-presets-head" data-i18n="shortcuts_suggested">Suggeriti</div>
+            <div id="shortcutPresets" class="shortcut-presets"></div>
+            <form id="shortcutAdd" class="shortcut-add" autocomplete="off">
+              <input type="text" id="shortcutName" maxlength="24" placeholder="Nome (es. Mail)" data-i18n-ph="fav_name_ph" aria-label="Nome" data-i18n-aria="fav_name_ph">
+              <input type="text" id="shortcutUrl" placeholder="https://…" data-i18n-ph="fav_url_ph" spellcheck="false" aria-label="URL" data-i18n-aria="fav_url_ph">
+              <button type="submit" data-i18n="add">Aggiungi</button>
+            </form>
+          </div>
         </div>
       </section>
 

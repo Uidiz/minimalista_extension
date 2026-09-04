@@ -18,6 +18,40 @@ const CATEGORIES = [
 ];
 
 /* ============================================================
+   Collegamenti rapidi (PRO): scelti in Aspetto e mostrati in alto
+   a destra nella nuova scheda, come i link Gmail/Immagini di Google.
+   Il catalogo è fisso; l'utente ne attiva alcuni (e può aggiungerne
+   di personalizzati, salvati come { preset: null, name, url }).
+   ============================================================ */
+const SHORTCUT_PRESETS = [
+  { id: "gmail",     url: "https://mail.google.com/",       labelKey: "sc_gmail" },
+  { id: "images",    url: "https://www.google.com/imghp",   labelKey: "sc_images" },
+  { id: "maps",      url: "https://maps.google.com/",       labelKey: "sc_maps" },
+  { id: "youtube",   url: "https://www.youtube.com/",       labelKey: "sc_youtube" },
+  { id: "calendar",  url: "https://calendar.google.com/",   labelKey: "sc_calendar" },
+  { id: "drive",     url: "https://drive.google.com/",      labelKey: "sc_drive" },
+  { id: "news",      url: "https://news.google.com/",       labelKey: "sc_news" },
+  { id: "translate", url: "https://translate.google.com/",  labelKey: "sc_translate" }
+];
+
+// Default (PRO): i due link tipici della home di Google.
+const DEFAULT_SHORTCUTS = [
+  { id: 1, preset: "gmail",  name: "", url: "https://mail.google.com/" },
+  { id: 2, preset: "images", name: "", url: "https://www.google.com/imghp" }
+];
+
+// Etichetta visibile di un collegamento: per i preset dipende dalla lingua
+// (t("sc_<id>")), per i personalizzati è il nome digitato dall'utente.
+function shortcutLabel(item) {
+  if (!item) return "";
+  if (item.preset) {
+    const p = SHORTCUT_PRESETS.find(x => x.id === item.preset);
+    if (p) return t(p.labelKey);
+  }
+  return String(item.name || "").trim();
+}
+
+/* ============================================================
    Configurazione ExtensionPay (pagamenti PRO — sezione 7)
    ============================================================ */
 
@@ -54,6 +88,11 @@ const DEFAULT_SETTINGS = {
   customThemes: [],          // temi salvati dall'utente: [{ id, name, bg, fg, accent }]
   searchEngine: "google",    // motore di ricerca della barra in nuova scheda (chiave di SEARCH_ENGINES)
   showSearch: true,          // mostra/nascondi la barra di ricerca nella nuova scheda
+  shortcuts: DEFAULT_SHORTCUTS, // PRO: collegamenti rapidi in alto a destra nella nuova scheda
+  showTodo: true,            // mostra/nascondi la card ToDo nella nuova scheda (Impostazioni → Home)
+  showFavorites: true,       // mostra/nascondi la card Preferiti nella nuova scheda
+  showFocus: true,           // mostra/nascondi la card Focus (riepilogo + interruttore) nella nuova scheda
+  bgMotion: "aurora",        // sfondo dei temi PRO: "aurora" (animato) | "static" | "plain"
   fontScale: 1.0,            // 0.6 – 1.2
   fontFamily: "sans",        // sans | serif | mono | cursive
   bgImage: "",               // URL di un'immagine di sfondo ("" = nessuna)
@@ -311,10 +350,31 @@ function applyTheme(root, settings, allowProTheme) {
   st.setProperty("--border", c.border);
 
   // tema PRO in gradiente: --bg-grad alimenta il body (sotto l'eventuale --bg-img).
+  // Lo sfondo PRO è a più strati — due bagliori radiali (uno dell'accento, uno del
+  // secondo colore) sopra il gradiente diagonale — così il tema si distingue subito
+  // dai temi normali a colore pieno. La classe theme-grad su <html> permette alle
+  // pagine (es. la dashboard) di attivare effetti extra come le card in vetro.
   if (c.gradient && Array.isArray(c.grad) && c.grad.length >= 2) {
-    st.setProperty("--bg-grad", `linear-gradient(160deg, ${c.grad[0]}, ${c.grad[1]})`);
+    const [g1, g2] = c.grad;
+    const accent = c.accent || "#9db8ff";
+    st.setProperty("--bg-grad",
+      `radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, ${accent} 30%, transparent), transparent 62%),` +
+      `radial-gradient(110% 85% at 90% 100%, color-mix(in srgb, ${g2} 65%, transparent), transparent 58%),` +
+      `linear-gradient(155deg, ${g1} 0%, ${g1} 34%, ${g2} 135%)`);
+    // secondo colore del gradiente, esposto per i blob dell'aurora animata
+    st.setProperty("--bg-grad-c2", g2);
+    root.classList.add("theme-grad");
+    // modalità dello sfondo PRO (Impostazioni → Home): aurora animata (default),
+    // bagliore statico o solo gradiente. È un attributo su <html> così la CSS
+    // della dashboard spegne l'animazione senza costi residui.
+    const bgMotion = settings && ["aurora", "static", "plain"].includes(settings.bgMotion) ? settings.bgMotion : "aurora";
+    if (bgMotion === "aurora") root.removeAttribute("data-bg-motion");
+    else root.setAttribute("data-bg-motion", bgMotion);
   } else {
     st.removeProperty("--bg-grad");
+    st.removeProperty("--bg-grad-c2");
+    root.classList.remove("theme-grad");
+    root.removeAttribute("data-bg-motion");
   }
 
   // immagine di sfondo: l'URL vive dentro url("..."), quindi doppi apici e

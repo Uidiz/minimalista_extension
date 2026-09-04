@@ -340,6 +340,40 @@ body.no-hover .theme-card { transition: none; }
 
 .check-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; cursor: pointer; }
 .check-row input { accent-color: var(--accent); width: 16px; height: 16px; }
+.check-row + .check-row { margin-top: 10px; }
+
+/* sezioni della nuova scheda (Home): interruttori moderni a card, con icona */
+.section-toggles { display: flex; flex-direction: column; gap: 8px; }
+.sec-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 2px);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.sec-toggle:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  transform: translateY(-1px);
+}
+.sec-toggle .sec-ico {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 6%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.sec-toggle .sec-ico svg { display: block; }
+.sec-toggle .sec-name { flex: 1; min-width: 0; font-size: 0.92rem; }
+.sec-toggle .switch { margin-left: auto; }
 /* check-row che segue dei campi (es. animazioni hover dentro Avanzate) */
 .card-hover-row { margin-top: 14px; }
 /* motore di ricerca: attenuato quando la barra è nascosta (senza barra non serve) */
@@ -469,7 +503,8 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
   inherits: false;
 }
 
-#proCard {
+#proCard,
+#shortcutsCard {
   position: relative;
   border: 2px solid transparent;
   background:
@@ -485,7 +520,7 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #proCard, .theme-card.pro { animation: none; }
+  #proCard, #shortcutsCard, .theme-card.pro { animation: none; }
   .theme-card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
   body:not(.no-hover) .theme-card:hover { transform: none; }
 }
@@ -610,6 +645,15 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 }
 .theme-card.pro .pro-badge { position: absolute; top: 6px; left: 8px; font-size: 0.5rem; padding: 2px 6px; }
 
+/* feedback al passaggio sulle card PRO: la rotazione del bordo a gradiente
+   accelera (5s → 1.5s), segnalando che la card sta per essere selezionata */
+#proCard:hover,
+#shortcutsCard:hover,
+.theme-card.pro:hover { animation-duration: 1.5s; }
+/* sui temi PRO il hover non deve coprire il gradiente animato con un bordo
+   pieno: la rotazione resta visibile attorno alla card */
+body:not(.no-hover) .theme-card.pro:hover { border-color: transparent; }
+
 #proPreviewBar {
   display: flex;
   align-items: center;
@@ -633,3 +677,48 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
   50% { outline-color: #6fe3c1; }
   100% { outline-color: #b57bff; }
 }
+
+/* ============================================================
+   Collegamenti rapidi (PRO) — Aspetto
+   ============================================================ */
+#shortcutsCard .row h2 { margin-bottom: 4px; }
+#shortcutsCard .pro-badge { flex-shrink: 0; margin-top: 4px; }
+#shortcutsLocked .btn-pro { margin-top: 2px; }
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.shortcut-row:last-of-type { border-bottom: none; }
+.shortcut-name { font-weight: 500; flex-shrink: 0; }
+.shortcut-url {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.shortcut-del {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 2px 6px;
+}
+.shortcut-del:hover { color: #ff8a80; }
+.shortcut-presets-head {
+  margin: 14px 0 8px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.shortcut-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+button.chip.shortcut-add { cursor: pointer; }
+button.chip.shortcut-add:hover { color: var(--accent); border-color: var(--accent); }
+.shortcut-add { display: flex; gap: 8px; margin-top: 14px; }
+.shortcut-add input:first-child { flex: 1; min-width: 0; }
+.shortcut-add input:nth-child(2) { flex: 1.6; min-width: 0; }
+#shortcutsMsg { min-height: 1em; margin: 6px 0 0; }

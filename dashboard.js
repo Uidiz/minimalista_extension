@@ -21,11 +21,19 @@ async function init() {
   renderClock();
   setInterval(renderClock, 250);
   renderStatus();
-  renderSearch();
+  renderSections();
+  renderQuickLinks();
   renderTodo();
   renderFavorites();
   renderFocus();
 
+  // i collegamenti rapidi si aprono in una nuova scheda (la dashboard resta aperta)
+  el("quickLinks").addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-url]");
+    if (!a) return;
+    e.preventDefault();
+    chrome.tabs.create({ url: a.dataset.url });
+  });
   el("searchForm").addEventListener("submit", onSearch);
   el("todoAdd").addEventListener("submit", onTodoAdd);
   el("todoClearDone").addEventListener("click", onClearDone);
@@ -47,7 +55,8 @@ async function init() {
       applyTheme(document.documentElement, settings); // tema + font aggiornati all'istante
       renderClock();
       renderStatus();
-      renderSearch();
+      renderSections();
+      renderQuickLinks();
       renderTodo();
       renderFavorites();
       renderFocus();
@@ -77,8 +86,33 @@ function renderStatus() {
   el("focusToggle").checked = settings.focusEnabled;
 }
 
-function renderSearch() {
+// Mostra/nasconde le sezioni della nuova scheda (configurabili in Impostazioni → Home)
+function renderSections() {
   el("searchCard").hidden = settings.showSearch === false;
+  el("todoCard").hidden = settings.showTodo === false;
+  el("favCard").hidden = settings.showFavorites === false;
+  el("focusCard").hidden = settings.showFocus === false;
+}
+
+/* ============================================================
+   Collegamenti rapidi (PRO) — riga in alto a destra
+   ============================================================ */
+function renderQuickLinks() {
+  const nav = el("quickLinks");
+  // funzione PRO: per i non-PRO la riga non esiste proprio
+  const list = isPro(settings) ? (settings.shortcuts || []) : [];
+  const items = list.filter(s => s && shortcutLabel(s) && /^https?:\/\//i.test(s.url || ""));
+  if (!items.length) {
+    nav.hidden = true;
+    nav.innerHTML = "";
+    return;
+  }
+  nav.hidden = false;
+  nav.innerHTML = items.map(s => {
+    const label = shortcutLabel(s);
+    const url = s.url;
+    return `<a href="${esc(url)}" data-url="${esc(url)}" title="${esc(url)}">${esc(label)}</a>`;
+  }).join("");
 }
 
 /* ============================================================
@@ -170,21 +204,40 @@ function onTodoSave(e) {
 }
 
 /* ============================================================
-   Preferiti
+   Preferiti — griglia launcher con icona del sito + nome sotto
    ============================================================ */
 let favEditMode = false;
+
+// Icona del sito dalla cache di Chrome (_favicon, permesso "favicon"): nessuna
+// richiesta di rete — l'estensione non contatta mai il sito o servizi esterni.
+function faviconUrl(url) {
+  try {
+    const u = new URL(chrome.runtime.getURL("/_favicon/"));
+    u.searchParams.set("pageUrl", url);
+    u.searchParams.set("size", "64");
+    return u.toString();
+  } catch { return ""; }
+}
 
 function renderFavorites() {
   const listEl = el("favList");
   if (!favorites.length) {
     listEl.innerHTML = `<div class="empty">${esc(t("fav_empty"))}</div>`;
   } else {
-    listEl.innerHTML = favorites.map(f => `
-      <span class="fav-item">
-        ${favEditMode
-          ? `<button class="fav-x" data-id="${f.id}" title="${esc(t("remove_aria"))}">✕</button>`
-          : `<a href="${esc(f.url)}" title="${esc(f.url)}">${esc(f.name)}</a>`}
-      </span>`).join("");
+    listEl.innerHTML = favorites.map(f => {
+      const letter = esc((f.name || "?").trim().charAt(0).toUpperCase() || "?");
+      const inner =
+        `<span class="fav-ico" data-letter="${letter}">` +
+        `<img class="fav-favicon" src="${esc(faviconUrl(f.url))}" alt="" loading="lazy">` +
+        `</span>` +
+        `<span class="fav-name">${esc(f.name)}</span>`;
+      // in modalità modifica il link è disattivato: sulla tile compare solo ✕
+      const body = favEditMode
+        ? `<button class="fav-x" data-id="${f.id}" title="${esc(t("remove_aria"))}" aria-label="${esc(t("remove_aria"))}">✕</button>` +
+          `<span class="fav-link">${inner}</span>`
+        : `<a class="fav-link" href="${esc(f.url)}" title="${esc(f.url)}">${inner}</a>`;
+      return `<span class="fav-item">${body}</span>`;
+    }).join("");
   }
   el("favEdit").textContent = favEditMode ? t("fav_done") : t("fav_edit");
   el("favAdd").hidden = !favEditMode;
@@ -195,6 +248,16 @@ function renderFavorites() {
       favorites = favorites.filter(f => f.id !== id);
       setFavorites(favorites).then(renderFavorites);
     });
+  });
+
+  // favicon non disponibile (sito mai visitato o immagine rotta) → iniziale del nome
+  listEl.querySelectorAll("img.fav-favicon").forEach(img => {
+    const missing = () => {
+      const tile = img.closest(".fav-item");
+      if (tile) tile.classList.add("no-favicon");
+    };
+    if (img.complete && img.naturalWidth === 0) missing();
+    img.addEventListener("error", missing);
   });
 }
 

@@ -1023,7 +1023,7 @@ async function main() {
     })()`);
     return r || null;
   });
-  check("riga del sito bloccata nell'interfaccia (toggle disabilitato + chip ⛓)", ctRowLocked === true);
+  check("riga del sito bloccata nell'interfaccia (toggle disabilitato + chip 🔒)", ctRowLocked === true);
 
   // il blocco ferreo ignora anche il periodo di grazia
   const ctTabId = await evaluate(optSess, `(async () => (await chrome.tabs.create({ url: "about:blank" })).id)()`);

@@ -639,12 +639,35 @@ function sanitizeSettings(s) {
       domains: customDoms
     };
   });
+  // collegamenti rapidi della nuova scheda (PRO): solo con la firma vengono
+  // conservati; ogni voce ha un preset del catalogo oppure nome + URL personalizzati
+  const shortcutsIn = pro && Array.isArray(out.shortcuts) ? out.shortcuts : [];
+  const seenUrls = new Set();
+  out.shortcuts = [];
+  for (const x of shortcutsIn) {
+    if (!x || typeof x !== "object") continue;
+    const url = String(x.url || "").trim().slice(0, 2048);
+    if (!/^https?:\/\//i.test(url) || seenUrls.has(url)) continue;
+    const preset = SHORTCUT_PRESETS.some(p => p.id === x.preset) ? x.preset : null;
+    const name = preset ? "" : String(x.name || "").trim().slice(0, 24);
+    if (!preset && !name) continue;
+    seenUrls.add(url);
+    out.shortcuts.push({
+      id: Number.isFinite(x.id) ? x.id : Date.now() + Math.random(),
+      preset, name, url
+    });
+  }
   out.graceMinutes = Math.min(120, Math.max(0, Math.round(Number(out.graceMinutes) || 5)));
   out.fontScale = Math.min(1.2, Math.max(0.6, Number(out.fontScale) || 1));
   out.fontFamily = ["sans", "serif", "mono", "cursive"].includes(out.fontFamily) ? out.fontFamily : "sans";
   out.searchEngine = SEARCH_ENGINES[out.searchEngine] ? out.searchEngine : "google";
   out.showSearch = out.showSearch !== false;
+  // sezioni della nuova scheda visibili/nascoste (Impostazioni → Home)
+  out.showTodo = out.showTodo !== false;
+  out.showFavorites = out.showFavorites !== false;
+  out.showFocus = out.showFocus !== false;
   out.cardHover = out.cardHover !== false;   // animazioni hover sulle card (Aspetto → Avanzate)
+  out.bgMotion = ["aurora", "static", "plain"].includes(out.bgMotion) ? out.bgMotion : "aurora"; // sfondo PRO (Home)
 
   // personalizzazione avanzata (immagine di sfondo + arrotondamento bordi)
   out.bgImage = typeof out.bgImage === "string" ? out.bgImage.trim().slice(0, 2048) : "";

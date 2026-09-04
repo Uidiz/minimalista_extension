@@ -49,7 +49,7 @@ async function init() {
     showLocked("🔒");
   } else if (REASON === "ct") {
     el("message").textContent = t("block_ct_msg");
-    showLocked("⛓");
+    showLocked("🔒");
   } else {
     const word = delay === 1 ? t("hold_second") : t("hold_seconds");
     el("message").textContent = t("block_hold_msg", { n: delay, word });

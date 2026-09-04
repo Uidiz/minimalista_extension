@@ -42,8 +42,13 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   configurabile in Aspetto.
 - **ToDo**: priorità (alta/media/bassa) e scadenza (nessuna/oggi/domani/data), ordinamento
   automatico (non completate → priorità → scadenza), modifica in un dialog, pulizia completate.
-- **Preferiti**: solo testo, in stile launcher minimalista, con modalità "modifica" per
-  aggiungere/rimuovere.
+- **Preferiti**: griglia launcher con l'**icona del sito** sopra e il nome sotto; l'icona
+  arriva dalla cache di Chrome (`_favicon`, permesso "favicon": nessuna richiesta di rete),
+  con l'iniziale del nome come fallback se il sito non è mai stato visitato. Modalità
+  "modifica" per aggiungere/rimuovere.
+- Le **sezioni della nuova scheda** (barra di ricerca, ToDo, Preferiti, Focus) si possono
+  nascondere singolarmente da Impostazioni → Home (`showSearch`/`showTodo`/`showFavorites`/
+  `showFocus`): nascondere non disattiva nulla, il Focus continua a bloccare.
 - Riepilogo **Focus**: siti limitati con i relativi tempi, interruttore globale, statistiche del giorno.
 
 ### 2.3 Statistiche
@@ -67,11 +72,37 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   il cambio lingua aggiorna all'istante tutte le pagine aperte.
 - **Motore di ricerca** della barra in nuova scheda (Google, DuckDuckGo, Bing, Brave), in Aspetto.
 - Mostra/nascondi la **barra di ricerca web** sulla nuova scheda (Aspetto → Nuova scheda).
+- **Collegamenti rapidi (PRO)** in alto a destra della nuova scheda (come i link Gmail/Immagini della home di Google): scelti in Aspetto → Collegamenti rapidi tra un catalogo preselezionato (Gmail, Immagini, Maps, YouTube, Calendar, Drive, News, Traduttore) oppure voci personalizzate nome + URL; si aprono in una nuova scheda. Mostrati solo con la firma PRO (`settings.shortcuts`, default: Gmail + Immagini).
 - **Immagine di sfondo e arrotondamento bordi** (Aspetto → Avanzate): URL di un'immagine di
   sfondo in copertura fissa (tutte le pagine tranne la pagina di blocco, che non carica
   `common.css`) e raggio degli angoli dell'interfaccia (0–24 px) esposto come CSS variable
   `--border-radius`; card e dialog lo derivano con `calc()` per mantenere le proporzioni.
   L'URL viene sanificato contro la CSS injection prima di essere iniettato in `--bg-img`.
+- **Sezione Impostazioni "Home"**: raccoglie tutto ciò che riguarda la nuova scheda — sezioni
+  visibili/nascoste (ricerca, ToDo, Preferiti, Focus), motore di ricerca, secondi
+  dell'orologio e i collegamenti rapidi PRO (in precedenza in Aspetto).
+- **Aurora PRO animata**: con i temi PRO la nuova scheda ha un livello `bg-aurora` con tre
+  blob radiali sfocati e luminosi (accento, secondo colore `--bg-grad-c2` e un bagliore
+  caldo centrale) in `mix-blend-mode: screen`, con deriva ampia e continua (12–22 s,
+  traslazioni fino a ~26vmax) così il movimento si nota subito pur restando lento ed
+  elegante; solo `transform` (compositor-friendly, niente repaint a schermo intero) e
+  rispetta `prefers-reduced-motion`.
+- **Sezioni nuova scheda → interruttori moderni**: nelle impostazioni Home le quattro
+  sezioni sono righe-card con icona SVG monocroma (lente, check, stella, mirino) e
+  interruttore (`switch`), non più checkbox semplici né emoji.
+- **Aurora leggera + modalità di sfondo**: i blob dell'aurora non usano più `filter: blur`
+  (era il costo GPU principale su layer da ~70vmax): la morbidezza viene dai radial-gradient
+  stessi, il movimento resta solo `transform`. In più si può scegliere la modalità
+  (`settings.bgMotion`, Impostazioni → Home → Sfondo dei temi PRO; la card è nascosta
+  per i non-PRO, visto che senza un tema PRO non ha effetto): `aurora` (animata,
+  default), `static` (bagliori fermi, animazione spenta via `data-bg-motion="static"`)
+  o `plain` (solo il gradiente del tema, layer nascosto).
+- **Hover sulle card PRO**: al passaggio del mouse la rotazione del bordo a gradiente
+  accelera (5s → 1.5s) su `#proCard`, `#shortcutsCard` e sui temi PRO, come feedback di
+  selezione; sui temi PRO il hover non copre più il gradiente con un bordo pieno.
+- **Card PRO con bordo animato**: oltre a `#proCard` e ai temi PRO, anche la card
+  "Collegamenti rapidi" (`#shortcutsCard`) usa il bordo a gradiente conico rotante
+  (`proCardSpin`), spento con `prefers-reduced-motion: reduce`.
 
 ### 2.5 Sicurezza
 - ~~PIN facoltativo sulle impostazioni~~: **rimosso** (ritenuto inutile: il blocco ferreo PRO è
@@ -99,7 +130,8 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 - **Cold Turkey** 🔥 (per sito o categoria): blocco totale e irreversibile per X ore/giorni.
   Vince su tutto — anche su Focus spento, sul limite e sul periodo di grazia — e non si può
   annullare né ridurre; l'interfaccia disabilita le righe coinvolte con un
-  countdown ⛓ fino alla scadenza.
+  countdown 🔒 fino alla scadenza (il lucchetto è l'icona del blocco ferreo, in
+  UI e nella pagina di blocco).
 - **Fasce orarie settimanali** (per sito o categoria): finestre di attivazione del blocco
   (giorni della settimana + orario, es. lun–ven 09:00–18:00). Fuori fascia il target non
   viene intercettato; dentro fascia si comporta secondo la sua modalità di base.
@@ -165,7 +197,9 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 - **`incognito: "split"`**: necessaria perché la pagina di blocco possa essere caricata nel
   frame principale di una scheda in incognito (con "spanning" Chrome la blocca con
   ERR_BLOCKED_BY_CLIENT; le impostazioni restano condivise via `chrome.storage.local`).
-- **Permissions**: `storage`, `tabs`, `webNavigation`, `alarms`.
+- **Permissions**: `storage`, `tabs`, `webNavigation`, `alarms`, `favicon`.
+  - `favicon` serve SOLO per le icone dei Preferiti (`chrome-extension://<id>/_favicon/`):
+    usa la cache di Chrome, nessuna richiesta di rete verso i siti o servizi esterni.
   - Nessun `host_permissions`: l'intercettazione avviene tramite l'API `webNavigation`
     (evento `onBeforeNavigate`), che non richiede accesso agli host.
 - **ExtensionPay non aggiunge permessi**: la verifica dello stato PRO è una `fetch` verso
@@ -196,6 +230,14 @@ settings: {
   customThemes: [{ id, name, bg, fg, accent }],  // temi custom salvati (3 colori ognuno)
   searchEngine: "google" | "duckduckgo" | "bing" | "brave",  // motore di ricerca della barra
   showSearch: boolean,            // mostra/nascondi la barra di ricerca nella nuova scheda
+  showTodo: boolean,              // mostra/nascondi la card ToDo nella nuova scheda (default true)
+  showFavorites: boolean,         // mostra/nascondi la card Preferiti nella nuova scheda (default true)
+  showFocus: boolean,             // mostra/nascondi la card Focus nella nuova scheda (default true)
+  bgMotion: "aurora" | "static" | "plain", // sfondo dei temi PRO (Home): aurora animata (default),
+              // bagliore statico (zero costo per frame) o solo gradiente
+  shortcuts: [{ id, preset|null, name, url }],  // PRO: collegamenti rapidi in alto a destra
+              // nella nuova scheda. preset = id del catalogo SHORTCUT_PRESETS (label localizzata)
+              // oppure null per le voci personalizzate (name = nome digitato). Default: Gmail + Immagini.
   // (``customBg``/``customText`` del vecchio tema "Custom" vengono migrati automaticamente
   //   al primo avvio in un customTheme nominato "Custom")
   fontScale: number,              // 0.6 – 1.2
@@ -396,6 +438,11 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
   `border` per interpolazione tra sfondo e testo; `applyTheme()` imposta le CSS custom properties
   (`--bg`, `--fg`, `--accent`, `--card`, `--muted`, `--border`), il font e la dimensione base:
   ogni pagina si ricolora all'istante.
+- **Sfondo PRO a più strati**: con i temi PRO `applyTheme()` scrive in `--bg-grad` un gradiente
+  composto (due bagliori radiali — uno tinto dell'accento, uno del secondo colore — sopra il
+  gradiente diagonale) invece del semplice sfumato a due colori, e aggiunge la classe `theme-grad`
+  su `<html>`: la dashboard la usa per l'**effetto vetro** (card semi-trasparenti con
+  `backdrop-filter`, così lo sfondo PRO traspare dalle card).
 - **Migrazione**: il vecchio tema "Custom" a due colori (`customBg`/`customText`) viene convertito
   al primo avvio (in `background.js` e `getSettings()`, in modo idempotente) in un tema custom
   nominato "Custom" con `accent = testo`.
@@ -500,7 +547,7 @@ node e2e-test.js
   `~/.cache/minimalista-cft`) perché supporta `--load-extension` (rimosso da Chrome 137+ branded).
 - Lancia Chrome in una **piccola finestra visibile**: gli eventi mouse via CDP richiedono
   hit-testing reale (con la finestra fuori schermo i click non arrivano).
-- Verifica (64 controlli):
+- Verifica (72 controlli):
   1. caricamento dell'estensione e id registrato;
   2. pagina impostazioni con API estensione, righe dei siti e 7 temi;
   3. salvataggio impostazioni via messaggio (con sanitizzazione);
@@ -528,7 +575,7 @@ node e2e-test.js
  13. **PRO**: strumenti bloccati senza abbonamento, UI di sblocco (bottone acquisto + login),
      firma falsificata rifiutata e revocata, avviso in build senza `EXT_PAY_ID`, `proRefresh`
      senza ExtensionPay, toggle di sviluppo, cold turkey dall'interfaccia (riga disabilitata
-     + chip ⛓, override del periodo di grazia con `r=ct`), fasce orarie dentro/fuori finestra.
+     + chip 🔒, override del periodo di grazia con `r=ct`), fasce orarie dentro/fuori finestra.
      (Il banner incognito non è coperto: non è simulabile in Chrome for Testing.)
 - Richiede Node ≥ 22 (fetch + WebSocket globali).
 - Se `CHROME_BIN` è impostato, usa quel binario invece di Chrome for Testing.
