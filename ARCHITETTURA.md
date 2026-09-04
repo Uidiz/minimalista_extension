@@ -74,9 +74,9 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   L'URL viene sanificato contro la CSS injection prima di essere iniettato in `--bg-img`.
 
 ### 2.5 Sicurezza
-- **PIN facoltativo** che protegge la pagina delle impostazioni (SHA-256 locale): senza PIN non si
-  possono rimuovere siti, cambiare tempi o disattivare i blocchi. La dashboard e il popup restano liberi.
-- Recupero PIN dimenticato: console del Service Worker → `chrome.storage.local.clear()` (vedi sezione 8).
+- ~~PIN facoltativo sulle impostazioni~~: **rimosso** (ritenuto inutile: il blocco ferreo PRO è
+  irreversibile e copre già i momenti di debolezza). La pagina impostazioni è accessibile
+  liberamente, senza schermata di blocco.
 
 ### 2.6 Popup (icona nella barra)
 - Interruttore Focus + riepilogo del giorno + link a dashboard e impostazioni.
@@ -98,7 +98,7 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 ### 2.8 Funzioni PRO (Cold Turkey + fasce orarie)
 - **Cold Turkey** 🔥 (per sito o categoria): blocco totale e irreversibile per X ore/giorni.
   Vince su tutto — anche su Focus spento, sul limite e sul periodo di grazia — e non si può
-  annullare né ridurre (nemmeno dal PIN); l'interfaccia disabilita le righe coinvolte con un
+  annullare né ridurre; l'interfaccia disabilita le righe coinvolte con un
   countdown ⛓ fino alla scadenza.
 - **Fasce orarie settimanali** (per sito o categoria): finestre di attivazione del blocco
   (giorni della settimana + orario, es. lun–ven 09:00–18:00). Fuori fascia il target non
@@ -202,7 +202,6 @@ settings: {
   fontFamily: "sans" | "serif" | "mono" | "cursive",
   showSeconds: boolean,
   lang: "auto" | "it" | "en" | "es" | "fr" | "de" | "pt",  // lingua UI; "auto" = lingua del browser
-  pinHash: string | null          // SHA-256 del PIN (null = nessun PIN)
   bgImage: string,                // URL immagine di sfondo ("" = nessuna) — Aspetto → Avanzate
   borderRadius: number,           // arrotondamento UI in px (0–24, default 8)
   categories: [{                  // configurazione per categoria (fusa col registry CATEGORIES)
@@ -362,8 +361,7 @@ normalmente tra le pagine del sito per i minuti configurati.
 
 ```
 options.js
-  ├─ PIN impostato? → schermata di blocco → sha256(pin) === settings.pinHash → sblocco
-  ├─ ogni modifica (siti, tempi, temi, PIN…) muta l'oggetto settings locale
+  ├─ ogni modifica (siti, categorie, tempi, temi, aspetto…) muta l'oggetto settings locale
   └─ chrome.runtime.sendMessage({ type: "saveSettings", settings })
        → background: sanitizeSettings() (normalizza domini, clamp 1–30s, filtra invalidi)
        → storage.local.set("settings")
@@ -544,9 +542,6 @@ node e2e-test.js
 
 ## 8. Note operative
 
-- **Recupero PIN dimenticato**: `chrome://extensions` → Minimalista → **Ispeziona**
-  (sotto *Servizi in background*) → nella console: `chrome.storage.local.clear()`.
-  Attenzione: azzera anche ToDo, preferiti e statistiche.
 - **Rigenerare le icone**: `node tools/resize-icons.js` (legge `m.png`, scrive `icons/`).
 - **Dati**: tutto in `chrome.storage.local`; disinstallando l'estensione i dati vengono rimossi.
 

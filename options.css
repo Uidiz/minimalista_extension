@@ -119,13 +119,69 @@ main h2 { margin-bottom: 8px; }
 }
 .warn-banner button { border-color: #ff8a80; color: #ff8a80; background: none; margin-left: auto; }
 
-#proCard h3 { font-size: 0.92rem; font-weight: 500; margin: 18px 0 6px; color: var(--fg); text-transform: none; letter-spacing: 0.02em; }
-.pro-block { border-top: 1px solid var(--border); padding-top: 6px; }
-.pro-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; font-size: 0.9rem; }
-.pro-row select { max-width: 240px; }
-.pro-row input[type="number"] { width: 70px; }
-.pro-row input[type="time"] { padding: 6px 8px; }
-.pro-list { margin: 6px 0; }
+/* ---------- strumenti PRO (blocco ferreo e fasce orarie): ognuno nel suo pannello ---------- */
+.pro-grid { display: grid; gap: 14px; margin-top: 16px; }
+.pro-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 4px);
+}
+.pro-tool-head { display: flex; align-items: flex-start; gap: 12px; }
+.pro-tool-ico {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(181, 123, 255, 0.18), rgba(79, 195, 247, 0.12));
+  border: 1px solid rgba(181, 123, 255, 0.3);
+}
+.pro-tool-title { min-width: 0; }
+.pro-tool-title h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--fg);
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+.pro-tool-title .hint { margin: 3px 0 0; }
+.pro-field { display: flex; flex-direction: column; gap: 7px; }
+.pro-field-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.pro-tool select { width: 100%; max-width: none; }
+.pro-tool input[type="number"] { width: 76px; }
+.pro-dur-row, .pro-time-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pro-dur-row button, .pro-time-row button { margin-left: auto; }
+.pro-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.pro-tool input[type="time"] { padding: 6px 8px; }
+.pro-tool-sec {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pro-tool-sec h4 {
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.pro-list { margin: 0; }
 .pro-list .pro-item {
   display: flex;
   align-items: center;
@@ -323,43 +379,6 @@ dialog.ct-confirm h3 { margin-bottom: 10px; }
 #bgImage { flex: 1; }
 #borderRadius { flex: 1; max-width: 260px; accent-color: var(--accent); }
 #borderRadiusVal { min-width: 38px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
-
-/* ---------- PIN ---------- */
-#lockScreen {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
-}
-.lock-card {
-  width: min(320px, calc(100vw - 40px));
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-#lockLogo {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto;
-  border-radius: 50%;
-  background: var(--card);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  font-weight: 200;
-}
-.lock-card input { text-align: center; letter-spacing: 0.5em; font-size: 1.2rem; }
-#pinError { color: #ff8a80; }
-
-#pinState { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-#pinState input { max-width: 180px; }
-#pinState .pin-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-#pinState .pin-active { color: #80d8ff; font-size: 0.9rem; }
 
 code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 0.8em; }
 

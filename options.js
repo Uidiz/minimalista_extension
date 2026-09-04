@@ -1,42 +1,21 @@
-// options.js — impostazioni: gestione siti, statistiche, aspetto, PIN.
+// options.js — impostazioni: siti, categorie, statistiche, aspetto, funzioni PRO.
 "use strict";
 
 let settings = null;
 const el = (id) => document.getElementById(id);
 
 /* ============================================================
-   Avvio: PIN gate poi render
+   Avvio: carica le impostazioni e mostra la pagina
    ============================================================ */
 async function init() {
   settings = await getSettings();
   setUILang(settings.lang);
   applyI18n(document);
   applyTheme(document.documentElement, settings);
-
-  if (settings.pinHash) {
-    el("lockScreen").hidden = false;
-    el("pinUnlock").addEventListener("click", tryUnlock);
-    el("pinInput").addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
-    return;
-  }
   showApp();
 }
 
-async function tryUnlock() {
-  const pin = el("pinInput").value;
-  if (!pin) return;
-  const hash = await sha256(pin);
-  if (hash === settings.pinHash) {
-    sessionStorage.setItem("minimalista_ok", "1");
-    showApp();
-  } else {
-    el("pinError").textContent = t("pin_wrong");
-    el("pinInput").value = "";
-  }
-}
-
 function showApp() {
-  el("lockScreen").hidden = true;
   el("app").hidden = false;
   renderAll();
   bindStatic();
@@ -153,7 +132,6 @@ function renderAll() {
   renderLang();
   renderSearchEngine();
   renderSearchToggle();
-  renderPin();
   renderDev();
   renderStats();
   el("focusToggle").checked = settings.focusEnabled;
@@ -594,54 +572,6 @@ function applySearchEngineState() {
   const on = settings.showSearch !== false;
   el("searchEngine").disabled = !on;
   el("searchEngineRow").classList.toggle("dimmed", !on);
-}
-
-/* ============================================================
-   SICUREZZA (PIN)
-   ============================================================ */
-function renderPin() {
-  const state = el("pinState");
-  if (settings.pinHash) {
-    state.innerHTML = `
-      <div class="pin-active">${esc(t("pin_active"))}</div>
-      <div class="pin-row">
-        <input type="password" id="pinCurrent" placeholder="${esc(t("pin_current_ph"))}" autocomplete="off">
-        <button id="pinRemove">${esc(t("pin_remove"))}</button>
-      </div>
-      <p class="hint" id="pinMsg"></p>`;
-    el("pinRemove").addEventListener("click", async () => {
-      const cur = el("pinCurrent").value;
-      if (!cur) return;
-      if ((await sha256(cur)) === settings.pinHash) {
-        settings.pinHash = null;
-        save();
-      } else {
-        el("pinMsg").textContent = t("pin_wrong");
-      }
-    });
-  } else {
-    state.innerHTML = `
-      <div class="pin-row">
-        <input type="password" id="pinNew" placeholder="${esc(t("pin_new_ph"))}" autocomplete="off">
-        <input type="password" id="pinNew2" placeholder="${esc(t("pin_confirm_ph"))}" autocomplete="off">
-        <button id="pinSet" class="primary">${esc(t("pin_set"))}</button>
-      </div>
-      <p class="hint" id="pinMsg"></p>`;
-    el("pinSet").addEventListener("click", async () => {
-      const a = el("pinNew").value;
-      const b = el("pinNew2").value;
-      if (!a) return;
-      if (a !== b) { el("pinMsg").textContent = t("pin_mismatch"); return; }
-      if (a.length < 4) { el("pinMsg").textContent = t("pin_too_short"); return; }
-      settings.pinHash = await sha256(a);
-      save();
-    });
-  }
-}
-
-async function sha256(str) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
 }
 
 /* ============================================================

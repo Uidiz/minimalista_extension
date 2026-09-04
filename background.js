@@ -671,8 +671,6 @@ function sanitizeSettings(s) {
   out.theme = FIXED_THEMES.includes(out.theme) || customIds.has(out.theme) || proThemeOk
     ? out.theme
     : "midnight";
-
-  out.pinHash = typeof out.pinHash === "string" ? out.pinHash : null;
   out.lang = LANGUAGES[out.lang] ? out.lang : "auto";
   // firma PRO opaca (solo segnale UI: le azioni critiche passano da verifyProLive)
   out[_PRO_SIG] = out[_PRO_SIG] === _PRO_OK ? _PRO_OK : null;

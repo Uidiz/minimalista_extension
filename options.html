@@ -8,18 +8,6 @@
 </head>
 <body>
 
-  <!-- Schermata di blocco PIN -->
-  <div id="lockScreen" hidden>
-    <div class="lock-card">
-      <div id="lockLogo">m</div>
-      <h1>Minimalista</h1>
-      <p class="hint" data-i18n="pin_locked_hint">Le impostazioni sono protette da PIN. Inseriscilo per continuare.</p>
-      <input type="password" id="pinInput" placeholder="PIN" data-i18n-ph="pin_ph" autocomplete="off">
-      <button class="primary" id="pinUnlock" data-i18n="pin_unlock">Sblocca</button>
-      <p class="hint" id="pinError"></p>
-    </div>
-  </div>
-
   <div id="app" hidden>
     <aside>
       <div class="brand">Minimalista</div>
@@ -27,7 +15,6 @@
         <button data-sec="focus" class="active" data-i18n="nav_focus">Focus</button>
         <button data-sec="stats" data-i18n="nav_stats">Statistiche</button>
         <button data-sec="appearance" data-i18n="nav_appearance">Aspetto</button>
-        <button data-sec="security" data-i18n="nav_security">Sicurezza</button>
         <button data-sec="info" data-i18n="nav_info">Info</button>
       </nav>
       <a href="dashboard.html" class="back-link" data-i18n="back_link">← Nuova scheda</a>
@@ -104,37 +91,71 @@
           </div>
           <div id="proTools" hidden>
             <p class="hint" id="proThanks" hidden data-i18n="pro_thanks">Grazie! Le funzioni PRO sono ora attive 🎉</p>
-            <div class="pro-block">
-              <h3 data-i18n="ct_title">Blocco ferreo</h3>
-              <p class="hint" data-i18n="ct_hint">Blocco totale e irreversibile del target scelto per le ore/giorni indicati: non si può disattivare né aggirare (nemmeno col PIN) finché non scade.</p>
-              <div class="pro-row">
-                <select id="ctTarget" aria-label="Target"></select>
-                <input type="number" id="ctHours" min="0" max="720" step="1" value="1" aria-label="Hours">
-                <span data-i18n="ct_hours">ore</span>
-                <input type="number" id="ctDays" min="0" max="60" step="1" value="0" aria-label="Days">
-                <span data-i18n="ct_days">giorni</span>
-                <button type="button" id="ctStart" class="danger-btn" data-i18n="ct_start">Attiva blocco</button>
+            <div class="pro-grid">
+
+              <!-- Blocco ferreo (Cold Turkey) -->
+              <div class="pro-tool">
+                <div class="pro-tool-head">
+                  <span class="pro-tool-ico">⛓</span>
+                  <div class="pro-tool-title">
+                    <h3 data-i18n="ct_title">Blocco ferreo</h3>
+                    <p class="hint" data-i18n="ct_hint">Blocco totale e irreversibile del target scelto per le ore/giorni indicati: non si può disattivare né aggirare finché non scade.</p>
+                  </div>
+                </div>
+                <div class="pro-field">
+                  <span class="pro-field-label" data-i18n="pro_target">Destinazione</span>
+                  <select id="ctTarget" aria-label="Target"></select>
+                </div>
+                <div class="pro-field">
+                  <span class="pro-field-label" data-i18n="pro_duration">Durata</span>
+                  <div class="pro-dur-row">
+                    <input type="number" id="ctHours" min="0" max="720" step="1" value="1" aria-label="Hours">
+                    <span data-i18n="ct_hours">ore</span>
+                    <input type="number" id="ctDays" min="0" max="60" step="1" value="0" aria-label="Days">
+                    <span data-i18n="ct_days">giorni</span>
+                    <button type="button" id="ctStart" class="danger-btn" data-i18n="ct_start">Attiva blocco</button>
+                  </div>
+                </div>
+                <div class="pro-tool-sec">
+                  <h4 data-i18n="ct_active_title">Blocchi ferrei attivi</h4>
+                  <div id="ctActive" class="pro-list"></div>
+                  <p class="hint" id="ctMsg"></p>
+                </div>
               </div>
-              <h3 data-i18n="ct_active_title">Blocchi ferrei attivi</h3>
-              <div id="ctActive" class="pro-list"></div>
-              <p class="hint" id="ctMsg"></p>
-            </div>
-            <div class="pro-block">
-              <h3 data-i18n="sched_title">Fasce orarie</h3>
-              <p class="hint" data-i18n="sched_hint">Il blocco del sito o della categoria è attivo solo nelle fasce scelte (es. lun–ven 09:00–18:00). Fuori fascia nessun blocco.</p>
-              <div class="pro-row">
-                <select id="schedTarget" aria-label="Target"></select>
+
+              <!-- Fasce orarie settimanali -->
+              <div class="pro-tool">
+                <div class="pro-tool-head">
+                  <span class="pro-tool-ico">🕒</span>
+                  <div class="pro-tool-title">
+                    <h3 data-i18n="sched_title">Fasce orarie</h3>
+                    <p class="hint" data-i18n="sched_hint">Il blocco del sito o della categoria è attivo solo nelle fasce scelte (es. lun–ven 09:00–18:00). Fuori fascia nessun blocco.</p>
+                  </div>
+                </div>
+                <div class="pro-field">
+                  <span class="pro-field-label" data-i18n="pro_target">Destinazione</span>
+                  <select id="schedTarget" aria-label="Target"></select>
+                </div>
+                <div class="pro-field">
+                  <span class="pro-field-label" data-i18n="pro_days">Giorni</span>
+                  <div class="pro-days" id="schedDays"></div>
+                </div>
+                <div class="pro-field">
+                  <span class="pro-field-label" data-i18n="pro_time">Orario</span>
+                  <div class="pro-time-row">
+                    <span data-i18n="sched_from">dalle</span>
+                    <input type="time" id="schedStart" value="09:00">
+                    <span data-i18n="sched_to">alle</span>
+                    <input type="time" id="schedEnd" value="18:00">
+                    <button type="button" id="schedSave" class="primary" data-i18n="save">Salva</button>
+                  </div>
+                </div>
+                <div class="pro-tool-sec">
+                  <h4 data-i18n="sched_active_title">Fasce attive</h4>
+                  <div id="schedList" class="pro-list"></div>
+                  <p class="hint" id="schedMsg"></p>
+                </div>
               </div>
-              <div class="pro-row" id="schedDays"></div>
-              <div class="pro-row">
-                <span data-i18n="sched_from">dalle</span>
-                <input type="time" id="schedStart" value="09:00">
-                <span data-i18n="sched_to">alle</span>
-                <input type="time" id="schedEnd" value="18:00">
-                <button type="button" id="schedSave" class="primary" data-i18n="save">Salva</button>
-              </div>
-              <div id="schedList" class="pro-list"></div>
-              <p class="hint" id="schedMsg"></p>
             </div>
           </div>
         </div>
@@ -297,23 +318,6 @@
             <input type="checkbox" id="cardHoverToggle">
             <span data-i18n="card_hover">Anima le card al passaggio del mouse</span>
           </label>
-        </div>
-      </section>
-
-      <!-- ================= SICUREZZA ================= -->
-      <section id="sec-security" hidden>
-        <div class="card">
-          <h2 data-i18n="security_block">Blocco impostazioni</h2>
-          <p class="hint" data-i18n="security_hint">
-            Imposta un PIN per impedire che queste impostazioni vengano modificate
-            (es. per non poter togliere i blocchi nei momenti di debolezza).
-            La nuova scheda e il popup restano liberi.
-          </p>
-          <div id="pinState"></div>
-          <p class="hint" style="margin-top:12px" data-i18n-html="pin_forgot_hint">
-            Se dimentichi il PIN: apri <code>chrome://extensions</code> → Minimalista → "Ispeziona"
-            (sotto Servizi in background) e nella console digita <code>chrome.storage.local.clear()</code>.
-          </p>
         </div>
       </section>
 

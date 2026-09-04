@@ -2,7 +2,7 @@
 
 > **Principio guida:** la versione gratuita resta completa e utilizzabile per sempre.
 > Pro non "sblocca" funzioni di base (bloccare i siti, il tieni-premuto, i limiti
-> giornalieri, i 7 temi, il PIN) ma aggiunge **potenziamenti** per chi vuole di più:
+> giornalieri, i 7 temi) ma aggiunge **potenziamenti** per chi vuole di più:
 > statistiche profonde, sincronizzazione tra dispositivi, strumenti motivazionali
 > e personalizzazione spinta.
 >
@@ -69,7 +69,7 @@
 - **Sottodomini separati**: `www.youtube.com` e `music.youtube.com` trattati come siti
   distinti, con limiti propri.
 - **Blocco "cold turkey"** 🔥: ✅ implementato come funzione PRO — bloccare un sito o
-  un'intera categoria per X ore/giorni **senza possibilità di override** (nemmeno dal PIN);
+  un'intera categoria per X ore/giorni **senza possibilità di override**;
   la scelta è irreversibile fino alla scadenza.
 
 ## 4. Motivazione e sfide

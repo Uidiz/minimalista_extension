@@ -61,7 +61,6 @@ const DEFAULT_SETTINGS = {
   cardHover: true,            // animazioni hover sulle card (sollevamento/ingrandimento + alone)
   showSeconds: false,
   lang: "auto",              // lingua dell'interfaccia: "auto" (browser) o codice da LANGUAGES
-  pinHash: null,              // SHA-256 del PIN di blocco impostazioni (null = nessun PIN)
   _aT: null                   // firma PRO opaca: solo per disegnare l'interfaccia (vedi isPro)
 };
 

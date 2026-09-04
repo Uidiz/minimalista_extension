@@ -50,8 +50,8 @@ visibile il motore di ricerca è inutile.
 - **Popup di conferma Cold Turkey** — `options.html`/`options.css`: nuovo `<dialog id="ctConfirm">`
   con riepilogo dinamico ("Stai per attivare un blocco ferreo su {label} per {dur}", durata es.
   "2 giorni, 3 ore" con componenti a zero omessi via `ctDurationLabel()`) e un avviso in evidenza
-  che spiega l'**irreversibilità**: niente aperture per tutta la durata, anche con Focus spento o
-  col PIN, impossibile annullare o ridurre prima della scadenza. Pulsanti Annulla /
+  che spiega l'**irreversibilità**: niente aperture per tutta la durata, anche con Focus spento,
+  impossibile annullare o ridurre prima della scadenza. Pulsanti Annulla /
   "Sì, attiva il blocco" (rosso pieno); ESC o Annulla chiudono senza fare nulla.
 - **Flusso** (`options.js`): `onCtStart()` ora valida e poi **apre il dialog** (niente più azione
   diretta); la conferma passa da `onCtConfirm()`, che spedisce il messaggio `coldTurkey` e applica
@@ -69,6 +69,29 @@ visibile il motore di ricerca è inutile.
 - **e2e**: il test "cold turkey attivato dall'interfaccia" ora passa dalla conferma (attende il
   dialog aperto, clicca su "Sì, attiva il blocco" e attende il `ctUntil` nello storage): suite
   **72/72** invariata.
+
+## Rimozione del PIN + riorganizzazione degli strumenti PRO — ✅ implementato
+
+**Richiesta utente:** il PIN della scheda Sicurezza non serve (con il blocco ferreo PRO
+irreversibile è inutile): eliminarlo del tutto. Inoltre "Blocco ferreo" e "Fasce orarie" erano
+troppo schiacciati dentro la stessa card PRO: organizzarli meglio.
+
+- **PIN rimosso completamente** — via la sezione "Sicurezza" (voce di navigazione + card), la
+  schermata di blocco `#lockScreen` e l'intero flusso: `options.js` (gate in `init`, `tryUnlock`,
+  `sha256`, `renderPin`, `pinHash`), `options.css` (stili lock/PIN), `common.js` e `background.js`
+  (chiave `pinHash` tolta dal modello di default e dalla sanitizzazione), `i18n.js` (chiavi
+  `security_*`, `pin_*` e `nav_security` rimosse dalle 6 lingue). Le impostazioni ora si aprono
+  direttamente. Anche i testi cold turkey (`ct_hint`, `ct_confirm_warn`) non citano più il PIN.
+- **Strumenti PRO organizzati in pannelli** — dentro `#proCard` (scheda Focus), "Blocco ferreo" e
+  "Fasce orarie" vivono ora in **due pannelli distinti** (`.pro-tool`) dentro `.pro-grid`: icona +
+  titolo + descrizione in testa, campi etichettati (Destinazione; Durata ore/giorni — Giorni +
+  Orario), sezione "attivi" separata con bordo punteggiato, e molto più respiro (spaziature,
+  select a tutta larghezza, pulsanti allineati a destra). Sostituiti i vecchi `.pro-block`/
+  `.pro-row` schiacciati. Nuove chiavi i18n `pro_target`, `pro_duration`, `pro_days`, `pro_time`,
+  `sched_active_title` (6 lingue). ID e classi usate dal JS e dai test invariati.
+- **Documentazione**: aggiornati `ARCHITETTURA.md` (sezione 2.5, modello dati, flusso 5.5,
+  note operative), `README.md` e `UPGRADESPRO.md`.
+- **e2e**: nessun test copriva il PIN; la suite resta **72/72**.
 
 ## Checklist per la pubblicazione
 

@@ -47,12 +47,6 @@ La nuova scheda di Chrome diventa la dashboard di Minimalista.
   Español, Français, Deutsch o Português — selettore nella sezione Aspetto.
 - Interruttore globale della Modalità Focus (anche dal popup dell'estensione).
 
-### Sicurezza
-- **PIN facoltativo** per proteggere le impostazioni: senza PIN non si possono rimuovere
-  i siti, cambiare i tempi o disattivare i blocchi.
-- Se dimentichi il PIN: `chrome://extensions` → Minimalista → **Ispeziona**
-  (sotto *Servizi in background*) → nella console digita `chrome.storage.local.clear()`.
-
 ## Privacy
 
 Tutto resta **sul tuo dispositivo** (`chrome.storage.local`). Nessun dato viene inviato
