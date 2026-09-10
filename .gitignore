@@ -12,6 +12,7 @@ node_modules/
 # Build artifacts
 *.zip
 *.crx
+dist/
 
 # Logs
 *.log

@@ -237,7 +237,11 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 | `m.png` | Icona originale dell'app (512×512) |
 | `tools/resize-icons.js` | Script Node puro per rigenerare le icone da `m.png` |
 | `tools/setup-cft.cjs` | Scarica Chrome for Testing per i test (cache in `~/.cache/minimalista-cft`) |
-| `e2e-test.js` | Test end-to-end (64 verifiche) |
+| `tools/package-zip.js` | Pacchetto di pubblicazione: zip con soli file runtime, auto-verifica e check di versione (vedi 8) |
+| `STORE_LISTING.md` | Testi pronti per la scheda del Chrome Web Store (IT/EN) con link sorgente AGPL |
+| `LICENSE` | GNU AGPL-3.0 (testo integrale ufficiale): licenza del progetto |
+| `DONE.md` | Resoconto delle attività completate |
+| `e2e-test.js` | Test end-to-end (69–83 verifiche a seconda dello stato PRO) |
 
 ### Manifest (`manifest.json`)
 - **MV3**, service worker in background, nessuna pagina `background.html`.
@@ -527,11 +531,10 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
      firma** (revoca della UI) e rifiuta l'operazione con `reason: "pro"`;
   3. un errore di rete è **fail-closed**: l'operazione è rifiutata ma l'ultimo stato noto
      della UI non viene toccato (un utente pagato non viene "sloggato" per un calo di rete).
-  Con **ExtensionPay non configurato** le azioni PRO restano bloccate per chiunque, tranne
-  quando è attivo il **toggle di sviluppo** (Impostazioni → Info → "PRO — solo sviluppo"):
-  in quella build `verifyProLive()` e `refreshProStatus()` rispondono true senza interrogare
-  il server e `sanitizeSettings` conserva il flag `_devPro`. È un espediente SOLO per lo
-  sviluppo locale: va rimosso prima della pubblicazione (checklist in `TODO.md`).
+  Con **ExtensionPay non configurato** le azioni PRO restano bloccate per chiunque (il
+  vecchio toggle di sviluppo "PRO — solo sviluppo" è stato **rimosso** prima della
+  pubblicazione: per testare le funzioni PRO si usa il test mode di extensionpay.com
+  con le carte Stripe di test, vedi checklist in `TODO.md`).
 - **Allineamento automatico**: `refreshProStatus()` interroga ExtensionPay all'avvio del
   service worker, all'installazione e all'avvio del browser, riallineando la firma UI allo
   stato reale; la pagina impostazioni può richiederlo esplicitamente col messaggio
@@ -575,7 +578,10 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
   `extensionpay.com`. Chrome Web Store non offre acquisti in-app nativi, quindi l'acquisto
   Lifetime avviene sulla pagina di pagamento ExtensionPay/Stripe. `EXT_PAY_ID` vuoto
   (= non ancora registrati su extensionpay.com) disabilita ExtensionPay: senza ID le
-  funzioni PRO restano bloccate (nessun toggle di sviluppo: va registrata l'estensione).
+  funzioni PRO restano bloccate. **Il progetto è rilasciato sotto AGPL-3.0** (file
+  `LICENSE`): la presenza di `ExtPay.js` rende l'estensione un'opera derivata della
+  libreria, quindi il sorgente va reso disponibile agli utenti (link nella scheda dello
+  store, vedi `STORE_LISTING.md` e `DONE.md`).
 - **Verifica PRO fail-closed**: un errore di rete non approva mai un'azione critica e non
   tocca lo stato UI; un "non pagato" (o ExtensionPay assente) rimuove anche la firma
   locale falsificata. Falsificare `chrome.storage.local` non sblocca nulla.
@@ -596,7 +602,7 @@ node e2e-test.js
   `~/.cache/minimalista-cft`) perché supporta `--load-extension` (rimosso da Chrome 137+ branded).
 - Lancia Chrome in una **piccola finestra visibile**: gli eventi mouse via CDP richiedono
   hit-testing reale (con la finestra fuori schermo i click non arrivano).
-- Verifica (72 controlli):
+- Verifica (~69–83 controlli a seconda dello stato PRO):
   1. caricamento dell'estensione e id registrato;
   2. pagina impostazioni con API estensione, righe dei siti e 7 temi;
   3. salvataggio impostazioni via messaggio (con sanitizzazione);
@@ -644,6 +650,14 @@ node e2e-test.js
 ## 8. Note operative
 
 - **Rigenerare le icone**: `node tools/resize-icons.js` (legge `m.png`, scrive `icons/`).
+- **Pacchetto di pubblicazione**: `node tools/package-zip.js` crea `dist/minimalista.zip`
+  con i soli file runtime e lo verifica; `--list` mostra l'elenco senza scrivere.
+  Un **check di sicurezza** blocca la creazione se la versione del manifest non è
+  aumentata rispetto all'ultima registrata in `dist/.last-version` (il Web Store rifiuta
+  versioni duplicate): per un aggiornamento basta incrementare `version` in
+  `manifest.json` e rilanciare.
+- **Testi scheda store**: `STORE_LISTING.md` (sostituire `[URL_DEL_REPOSITORIO]` con il
+  link al sorgente, obbligo AGPL).
 - **Dati**: tutto in `chrome.storage.local`; disinstallando l'estensione i dati vengono rimossi.
 
 ---

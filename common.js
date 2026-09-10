@@ -56,10 +56,10 @@ function shortcutLabel(item) {
    ============================================================ */
 
 // ID dell'estensione registrata su extensionpay.com (sezione "Extensions" del
-// sito). Vuoto = ExtensionPay disabilitato: in sviluppo le funzioni PRO si
-// sbloccano solo col toggle in Info (da rimuovere prima della pubblicazione).
+// sito). Vuoto = ExtensionPay disabilitato: in produzione senza ID le funzioni
+// PRO restano bloccate per tutti.
 // NB: è l'ID registrato su extensionpay.com, NON necessariamente chrome.runtime.id.
-const EXT_PAY_ID = "";
+const EXT_PAY_ID = "minimalista";
 
 // La libreria ExtPay.js (in fondo al progetto) è caricata e l'ID è configurato?
 function extpayConfigured() {

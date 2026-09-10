@@ -142,7 +142,6 @@ function renderAll() {
   renderHomeSectionsToggles();
   renderBgMotion();
   renderMembership();
-  renderProDev();
   renderStats();
   el("focusToggle").checked = settings.focusEnabled;
 }
@@ -1031,26 +1030,6 @@ function renderPro() {
   renderAdvanced();   // sblocca/blocca l'immagine di sfondo (URL) al cambio firma
   // la card "Sfondo dei temi PRO" ha senso solo con un tema PRO applicabile
   el("bgMotionCard").hidden = !unlocked;
-}
-
-/* Toggle di sviluppo PRO (Impostazioni → Info): sblocca le funzioni PRO in
-   locale senza verifica di pagamento. SOLO per le build di sviluppo: va rimosso
-   prima della pubblicazione (il background lo rispetta in verifyProLive). */
-let proDevBound = false;
-function renderProDev() {
-  const tgl = el("proDevToggle");
-  if (!tgl) return;
-  tgl.checked = !!settings._devPro;
-  if (proDevBound) return;
-  proDevBound = true;
-  tgl.addEventListener("change", async (e) => {
-    settings._devPro = e.target.checked;
-    settings[_PRO_SIG] = e.target.checked ? _PRO_OK : null;
-    await sendMessage({ type: "saveSettings", settings });
-    settings = await getSettings();
-    renderPro();
-    renderProDev();
-  });
 }
 
 /* ============================================================

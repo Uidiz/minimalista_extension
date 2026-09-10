@@ -899,50 +899,72 @@ async function main() {
   })()`);
   check("UI Membership: piano attuale + acquisto/login + elenco funzioni PRO", payUi === true);
 
-  // build di sviluppo (EXT_PAY_ID vuoto): il click sul pulsante non apre pagine e mostra l'avviso
-  const unconf = await evaluate(optSess, `(async () => {
-    document.getElementById("proMsg").textContent = "";
-    await onProUnlock();
-    await new Promise(r => setTimeout(r, 300));
-    return document.getElementById("proMsg").textContent.length > 0
-      && !location.href.includes("extensionpay.com");
+  // Il pulsante "Sblocca PRO" dipende dalla build: senza EXT_PAY_ID mostra
+  // l'avviso di build non configurata; con l'ID apre la pagina di pagamento.
+  const epConfigured = await evaluate(optSess, `(async () => {
+    try { return typeof extpayConfigured === "function" && extpayConfigured(); }
+    catch { return false; }
   })()`);
-  check("senza EXT_PAY_ID il pulsante mostra l'avviso di build non configurata", unconf === true);
+  if (!epConfigured) {
+    const unconf = await evaluate(optSess, `(async () => {
+      document.getElementById("proMsg").textContent = "";
+      await onProUnlock();
+      await new Promise(r => setTimeout(r, 300));
+      return document.getElementById("proMsg").textContent.length > 0
+        && !location.href.includes("extensionpay.com");
+    })()`);
+    check("senza EXT_PAY_ID il pulsante mostra l'avviso di build non configurata", unconf === true);
+  } else {
+    const payOpens = await evaluate(optSess, `(async () => {
+      document.getElementById("proMsg").textContent = "";
+      await onProUnlock();
+      await new Promise(r => setTimeout(r, 800));
+      const tabs = await chrome.tabs.query({});
+      return document.getElementById("proMsg").textContent.length === 0
+        && tabs.some(t => (t.url || "").includes("extensionpay.com"));
+    })()`);
+    check("con EXT_PAY_ID il pulsante apre la pagina di pagamento ExtensionPay", payOpens === true);
+  }
 
-  // proRefresh: senza ExtensionPay configurato (e senza toggle) risponde paid:false senza toccare la firma
+  // proRefresh: interroga ExtensionPay e allinea la firma UI allo stato reale
+  // (paid:false → firma invariata; paid:true → firma presente)
   const proRefresh = await evaluate(optSess, `(async () => {
     const s0 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
     const resp = await chrome.runtime.sendMessage({ type: "proRefresh" });
     await new Promise(r => setTimeout(r, 300));
     const s1 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
-    return { ok: resp && resp.ok, paid: resp && resp.paid, sig0: s0._aT, sig1: s1._aT };
+    const paid = !!(resp && resp.paid);
+    return { ok: resp && resp.ok, paid, sigOk: paid ? s1._aT === _PRO_OK : s1._aT === s0._aT };
   })()`);
-  check("proRefresh senza ExtensionPay: ok, paid:false, firma invariata",
-    proRefresh && proRefresh.ok === true && proRefresh.paid === false && proRefresh.sig0 === proRefresh.sig1,
+  check("proRefresh: ok, paid coerente col server, firma allineata allo stato",
+    proRefresh && proRefresh.ok === true && proRefresh.sigOk === true,
     proRefresh ? JSON.stringify(proRefresh) : "");
 
-  const forged = await evaluate(optSess, `(async () => {
-    const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
-    s._aT = "x8f9q"; // firma falsificata: la UI lo mostrerebbe come PRO…
-    await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
-    const resp = await chrome.runtime.sendMessage({ type: "coldTurkey", kind: "site", id: 1, hours: 1, days: 0 });
-    await new Promise(r => setTimeout(r, 400));
-    const s2 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
-    return { ok: resp && resp.ok, reason: resp && resp.reason, sig: s2._aT };
-  })()`);
-  check("senza verifica live il cold turkey è rifiutato e la firma locale viene rimossa",
-    forged && forged.ok !== true && forged.reason === "pro" && !forged.sig, forged ? JSON.stringify(forged) : "");
+  // senza un account pagante (o ExtensionPay assente) la firma falsificata da
+  // sola non basta: il cold turkey viene rifiutato e la firma locale rimossa.
+  if (!(proRefresh && proRefresh.paid)) {
+    const forged = await evaluate(optSess, `(async () => {
+      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      s._aT = "x8f9q"; // firma falsificata: la UI lo mostrerebbe come PRO…
+      await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+      const resp = await chrome.runtime.sendMessage({ type: "coldTurkey", kind: "site", id: 1, hours: 1, days: 0 });
+      await new Promise(r => setTimeout(r, 400));
+      const s2 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      return { ok: resp && resp.ok, reason: resp && resp.reason, sig: s2._aT };
+    })()`);
+    check("senza verifica live il cold turkey è rifiutato e la firma locale viene rimossa",
+      forged && forged.ok !== true && forged.reason === "pro" && !forged.sig, forged ? JSON.stringify(forged) : "");
+  }
 
-  // PRO attivabile solo con ExtensionPay configurato (EXT_PAY_ID): il toggle di
-  // sviluppo (Info) è stato rimosso, quindi senza ID le funzioni PRO restano
-  // bloccate e i test di attivazione qui sotto vengono saltati.
-  const proAvailable = await evaluate(optSess, `(async () => {
-    try { return typeof extpayConfigured === "function" && extpayConfigured(); }
-    catch { return false; }
-  })()`);
+  // Le attivazioni PRO reali (tema gradiente, sfondo, categorie, cold turkey,
+  // fasce orarie) girano solo con un account pagante: verifyProLive interroga
+  // ExtensionPay e rifiuta (fail-closed) chi non è pagato. Senza account
+  // pagante i test di attivazione qui sotto vengono saltati (per abilitarli:
+  // imposta lo stato pagato dell'account di sviluppo su extensionpay.com).
+  const proActive = !!(proRefresh && proRefresh.paid);
 
   // con PRO attivo un tema gradiente si applica e si salva (firma presente)
-  if (proAvailable) {
+  if (proActive) {
   const proThemeApplied = await waitFor(async () => {
     const out = await evaluate(optSess, `(async () => {
       const read = async () => {
@@ -1108,7 +1130,7 @@ async function main() {
   });
   check("dentro la fascia oraria il sito viene intercettato", !!schedBlock, schedBlock || "");
   } else {
-    console.log("  …attivazione PRO saltata: EXT_PAY_ID non configurato in questa build (senza toggle di sviluppo)");
+    console.log("  …attivazione PRO saltata: nessun account pagante rilevato (per testarle, imposta lo stato pagato dell'account di sviluppo su extensionpay.com)");
   }
 
   /* ---------- 13. confronto settimanale (grafici) + coroncina Membership ---------- */
@@ -1164,28 +1186,11 @@ async function main() {
   });
   check("voce Membership: nessuna decorazione (né corona né sottolineato)", navClean === true);
 
-  /* ---------- 14. toggle PRO di sviluppo + editor fasce orarie + Avanzate ---------- */
-  console.log("14. Toggle PRO di sviluppo, editor fasce orarie, card Avanzate");
+  /* ---------- 14. editor fasce orarie (PRO) + card Avanzate + stile Membership ---------- */
+  console.log("14. Editor fasce orarie (PRO), card Avanzate, stile Membership");
 
-  // il toggle di sviluppo sta in Info: lo attiva e sblocca le funzioni PRO in locale
-  const devOn = await waitFor(async () => {
-    const r = await evaluate(optSess, `(async () => {
-      switchSection("info");
-      const tgl = document.getElementById("proDevToggle");
-      if (!tgl) return null;
-      tgl.checked = true;
-      tgl.dispatchEvent(new Event("change", { bubbles: true }));
-      for (let i = 0; i < 12; i++) {
-        await new Promise(r2 => setTimeout(r2, 200));
-        const s = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
-        if (s._devPro === true && s._aT === _PRO_OK) return true;
-      }
-      return null;
-    })()`);
-    return r || null;
-  });
-  check("toggle PRO di sviluppo: attiva la firma PRO in locale (Info)", devOn === true);
-
+  // le funzioni PRO si sbloccano solo con un account pagante reale (verifyProLive)
+  if (proActive) {
   const proUnlocked = await waitFor(async () => {
     const r = await evaluate(optSess, `(() => {
       switchSection("focus");
@@ -1196,7 +1201,7 @@ async function main() {
     })()`);
     return r || null;
   });
-  check("con il toggle attivo le funzioni PRO si sbloccano (Focus + Membership Lifetime)", proUnlocked === true);
+  check("con PRO attivo le funzioni PRO si sbloccano (Focus + Membership Lifetime)", proUnlocked === true);
 
   // card Avanzate: contiene una funzione PRO (immagine di sfondo URL) → bordo a gradiente
   const advGrad = await evaluate(optSess, `(() => {
@@ -1230,7 +1235,7 @@ async function main() {
     })()`);
     return r || null;
   });
-  check("fascia salvata dalla UI (lun+mer 08:30–17:45) con il toggle PRO attivo", schedSaved === true);
+  check("fascia salvata dalla UI (lun+mer 08:30–17:45) con PRO attivo", schedSaved === true);
 
   // selezione stabile: un blocco ferreo scaduto non azzera più i giorni dopo ~1 s
   const schedStable = await waitFor(async () => {
@@ -1273,25 +1278,9 @@ async function main() {
     return start === "8:30" && end === "17:45" && on === "1,3" && nativeTimes === 0 ? { start, end, on } : null;
   })()`);
   check("orari e giorni salvati ripresi nell'editor (8:30–17:45, lun+mer), senza input[type=time]", !!schedTimesOk, schedTimesOk ? JSON.stringify(schedTimesOk) : "");
-
-  // disattivazione: la firma PRO viene rimossa e la UI torna bloccata
-  const devOff = await waitFor(async () => {
-    const r = await evaluate(optSess, `(async () => {
-      switchSection("info");
-      const tgl = document.getElementById("proDevToggle");
-      if (!tgl) return null;
-      tgl.checked = false;
-      tgl.dispatchEvent(new Event("change", { bubbles: true }));
-      for (let i = 0; i < 12; i++) {
-        await new Promise(r2 => setTimeout(r2, 200));
-        const s = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
-        if (s._devPro === false && !s._aT) return true;
-      }
-      return null;
-    })()`);
-    return r || null;
-  });
-  check("toggle disattivato: firma PRO rimossa e UI di nuovo bloccata", devOff === true);
+  } else {
+    console.log("  …attivazione PRO saltata: nessun account pagante rilevato (per testarle, imposta lo stato pagato dell'account di sviluppo su extensionpay.com)");
+  }
 
   // stile Membership: corona del piano neutra ≠ corona dorata PRO; scritta del
   // pulsante Unlock sempre leggibile (colore fisso, non l'accento del tema)

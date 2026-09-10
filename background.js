@@ -45,7 +45,6 @@ async function setProSig(on) {
 // Interroga ExtensionPay e allinea la firma UI. Usata all'avvio/installazione
 // e alla richiesta esplicita delle pagine ("proRefresh", es. dopo il pagamento).
 async function refreshProStatus() {
-  if (settings && settings._devPro) { await setProSig(true); return true; } // toggle di sviluppo
   if (!extpayConfigured()) return false;
   try {
     const user = await ensureExtPay().getUser();
@@ -572,13 +571,6 @@ function sanitizeSchedule(s) {
 // nulla; ogni "no" definitivo (non pagato, o ExtensionPay assente) rimuove
 // anche la firma UI, così una firma falsificata da sola non sblocca mai nulla.
 async function verifyProLive() {
-  // Toggle di sviluppo (Impostazioni → Info): sblocca le funzioni PRO in locale
-  // senza verifica di pagamento. Solo per le build di sviluppo: va rimosso
-  // prima della pubblicazione.
-  if (settings && settings._devPro) {
-    await setProSig(true);
-    return true;
-  }
   const ep = ensureExtPay();
   if (!ep) {
     await setProSig(false); // build senza ExtensionPay: la firma da sola non basta
@@ -695,7 +687,5 @@ function sanitizeSettings(s) {
   out.lang = LANGUAGES[out.lang] ? out.lang : "auto";
   // firma PRO opaca (solo segnale UI: le azioni critiche passano da verifyProLive)
   out[_PRO_SIG] = out[_PRO_SIG] === _PRO_OK ? _PRO_OK : null;
-  // toggle di sviluppo (Impostazioni → Info): si conserva solo nelle build locali
-  out._devPro = !!(s && s._devPro);
   return out;
 }
