@@ -6,17 +6,34 @@ let todo = [];
 let favorites = [];
 let stats = null;
 let editingId = null; // id dell'attività ToDo in modifica
+let previewThemeId = null; // tema PRO in anteprima (dashboard aperta con ?preview=<id>, mai salvato)
+let statsOffset = 0;       // giorni indietro nella vista statistiche del giorno
 
 const el = (id) => document.getElementById(id);
+
+// Applica il tema corrente: se la dashboard è stata aperta in anteprima di un
+// tema PRO (?preview=<id>, dai non-PRO nelle impostazioni) lo forza in memoria
+// (allowProTheme), senza mai persistirlo.
+function applyCurrentTheme() {
+  if (previewThemeId) applyTheme(document.documentElement, { ...settings, theme: previewThemeId }, true);
+  else applyTheme(document.documentElement, settings);
+}
 
 async function init() {
   settings = await getSettings();
   todo = await getTodo();
   favorites = await getFavorites();
   stats = await getStats();
+  // anteprima tema PRO: la dashboard arriva da options.html?preview=pr-xxx
+  const preview = new URLSearchParams(location.search).get("preview");
+  if (preview && PRO_THEME_IDS.includes(preview)) {
+    previewThemeId = preview;
+    el("previewBannerName").textContent = PRO_THEMES[preview].label;
+    el("previewBanner").hidden = false;
+  }
   setUILang(settings.lang);
   applyI18n(document);
-  applyTheme(document.documentElement, settings);
+  applyCurrentTheme();
 
   renderClock();
   setInterval(renderClock, 250);
@@ -45,6 +62,16 @@ async function init() {
   el("dDue").addEventListener("change", () => {
     el("dDate").hidden = el("dDue").value !== "custom";
   });
+  // navigazione nello storico delle statistiche: ‹ › esplorano i giorni passati
+  el("statsPrev").addEventListener("click", () => { statsOffset = Math.min(69, statsOffset + 1); renderFocus(); });
+  el("statsNext").addEventListener("click", () => { statsOffset = Math.max(0, statsOffset - 1); renderFocus(); });
+  // chiusura dell'anteprima del tema PRO: si torna al tema normale
+  el("previewBannerClose").addEventListener("click", () => {
+    previewThemeId = null;
+    el("previewBanner").hidden = true;
+    applyCurrentTheme();
+    try { history.replaceState(null, "", location.pathname); } catch { /* ignora */ }
+  });
 
   onStorageChange((changes) => {
     if (changes.settings) {
@@ -52,7 +79,7 @@ async function init() {
       settings = { ...settings, ...ns, sites: ns.sites || settings.sites };
       setUILang(settings.lang);
       applyI18n(document);
-      applyTheme(document.documentElement, settings); // tema + font aggiornati all'istante
+      applyCurrentTheme(); // tema + font aggiornati all'istante
       renderClock();
       renderStatus();
       renderSections();
@@ -221,10 +248,21 @@ function faviconUrl(url) {
 
 function renderFavorites() {
   const listEl = el("favList");
+  // con la Modalità Focus attiva, i preferiti che fanno parte della lista Focus
+  // vengono nascosti dalla griglia ("lontano dagli occhi, lontano dal cuore");
+  // in modalità modifica si rivedono, così si possono rimuovere.
+  const hiding = settings.focusEnabled && !favEditMode;
+  const shown = hiding ? favorites.filter(f => !siteFor(f.url, settings.sites)) : favorites;
+  const hiddenCount = favorites.length - shown.length;
+  el("favHiddenHint").hidden = hiddenCount === 0;
+  el("favHiddenHint").textContent = hiddenCount ? t("fav_hidden_hint", { n: hiddenCount }) : "";
+
   if (!favorites.length) {
     listEl.innerHTML = `<div class="empty">${esc(t("fav_empty"))}</div>`;
+  } else if (!shown.length) {
+    listEl.innerHTML = ""; // tutti nascosti: lo spiega l'hint
   } else {
-    listEl.innerHTML = favorites.map(f => {
+    listEl.innerHTML = shown.map(f => {
       const letter = esc((f.name || "?").trim().charAt(0).toUpperCase() || "?");
       const inner =
         `<span class="fav-ico" data-letter="${letter}">` +
@@ -297,7 +335,11 @@ function renderFocus() {
     ch.addEventListener("click", () => location.href = "options.html#focus");
   });
 
-  const today = dayKey();
+  // vista del giorno: ‹ › esplorano lo storico (offset = giorni indietro da oggi)
+  const view = addDays(new Date(), -statsOffset);
+  const today = dayKey(view);
+  el("statsDayLabel").textContent = statsOffset === 0 ? t("day_today") : statsOffset === 1 ? t("day_yesterday") : fmtDayLabel(today);
+  el("statsNext").disabled = statsOffset === 0;
   const dayData = stats.byDay[today] || {};
   const { distracting, other } = splitByCategory(dayData, settings);
   const distSecs = totalSeconds(distracting);

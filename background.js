@@ -35,12 +35,6 @@ if (extpayConfigured()) {
   try { ensureExtPay().startBackground(); } catch { /* ExtPay assente o non registrato */ }
 }
 
-// Dev toggle (Info → "PRO — solo sviluppo"): da rimuovere prima della pubblicazione.
-async function devProOn() {
-  try { const d = await chrome.storage.local.get("_devPro"); return d._devPro === true; }
-  catch { return false; }
-}
-
 // Imposta/rimuove la firma UI (_aT) in settings, persistendo solo se cambia.
 async function setProSig(on) {
   if (!settings || (settings[_PRO_SIG] === _PRO_OK) === !!on) return;
@@ -51,11 +45,12 @@ async function setProSig(on) {
 // Interroga ExtensionPay e allinea la firma UI. Usata all'avvio/installazione
 // e alla richiesta esplicita delle pagine ("proRefresh", es. dopo il pagamento).
 async function refreshProStatus() {
+  if (settings && settings._devPro) { await setProSig(true); return true; } // toggle di sviluppo
   if (!extpayConfigured()) return false;
   try {
     const user = await ensureExtPay().getUser();
     const paid = !!(user && user.paid);
-    await setProSig(paid || (await devProOn()));
+    await setProSig(paid);
     return paid;
   } catch {
     return false; // errore di rete/account: non si tocca l'ultimo stato noto
@@ -238,14 +233,6 @@ function ensureListeners() {
 
         case "setFocus": {
           settings.focusEnabled = !!msg.value;
-          await storageSet("settings", settings);
-          sendResponse({ ok: true });
-          break;
-        }
-
-        case "proTest": {
-          // Toggle di sviluppo: marca l'interfaccia come PRO (solo segnale UI).
-          settings[_PRO_SIG] = msg.on ? _PRO_OK : null;
           await storageSet("settings", settings);
           sendResponse({ ok: true });
           break;
@@ -578,14 +565,20 @@ function sanitizeSchedule(s) {
 }
 
 // Verifica "live" dello stato PRO per le azioni critiche (cold turkey, fasce
-// orarie): NON ci si fida mai della sola firma locale. Con ExtensionPay
-// configurato si interroga il server (extpay.getUser → user.paid); in sviluppo
-// (o finché EXT_PAY_ID è vuoto) l'unica fonte che approva è il toggle in Info.
+// orarie, categorie personalizzate): NON ci si fida mai della sola firma locale.
+// Si interroga il server di ExtensionPay (extpay.getUser → user.paid) quando
+// l'ID è configurato; senza ExtensionPay la risposta è sempre "no".
 // Fallisce in modo conservativo (fail-closed): un errore di rete non sblocca
 // nulla; ogni "no" definitivo (non pagato, o ExtensionPay assente) rimuove
 // anche la firma UI, così una firma falsificata da sola non sblocca mai nulla.
 async function verifyProLive() {
-  if (await devProOn()) return true;
+  // Toggle di sviluppo (Impostazioni → Info): sblocca le funzioni PRO in locale
+  // senza verifica di pagamento. Solo per le build di sviluppo: va rimosso
+  // prima della pubblicazione.
+  if (settings && settings._devPro) {
+    await setProSig(true);
+    return true;
+  }
   const ep = ensureExtPay();
   if (!ep) {
     await setProSig(false); // build senza ExtensionPay: la firma da sola non basta
@@ -669,8 +662,11 @@ function sanitizeSettings(s) {
   out.cardHover = out.cardHover !== false;   // animazioni hover sulle card (Aspetto → Avanzate)
   out.bgMotion = ["aurora", "static", "plain"].includes(out.bgMotion) ? out.bgMotion : "aurora"; // sfondo PRO (Home)
 
-  // personalizzazione avanzata (immagine di sfondo + arrotondamento bordi)
-  out.bgImage = typeof out.bgImage === "string" ? out.bgImage.trim().slice(0, 2048) : "";
+  // personalizzazione avanzata (immagine di sfondo + arrotondamento bordi).
+  // L'immagine di sfondo è una funzione PRO: senza la firma non viene mai
+  // conservata (né quella globale né quella dei temi custom).
+  const bgImgClean = typeof out.bgImage === "string" ? out.bgImage.trim().slice(0, 2048) : "";
+  out.bgImage = pro ? bgImgClean : "";
   // mancante (null/"") o non numerico → fallback 8; altrimenti clamp 0 – 24
   const borderRadiusNum = (out.borderRadius == null || out.borderRadius === "") ? NaN : Number(out.borderRadius);
   out.borderRadius = Number.isFinite(borderRadiusNum)
@@ -678,6 +674,7 @@ function sanitizeSettings(s) {
     : 8;
 
   // temi custom: nome libero (max 24 caratteri), tre colori RGB 0–255, id stabile
+  // e (PRO) immagine di sfondo opzionale associata al tema
   out.customThemes = (Array.isArray(out.customThemes) ? out.customThemes : [])
     .filter(x => x && typeof x === "object")
     .map(x => ({
@@ -685,7 +682,8 @@ function sanitizeSettings(s) {
       name: (String(x.name || "").trim() || "Custom").slice(0, 24),
       bg: sanitizeThemeColor(x.bg),
       fg: sanitizeThemeColor(x.fg),
-      accent: sanitizeThemeColor(x.accent)
+      accent: sanitizeThemeColor(x.accent),
+      bgImage: pro ? (typeof x.bgImage === "string" ? x.bgImage.trim().slice(0, 2048) : "") : ""
     }));
   const customIds = new Set(out.customThemes.map(t => t.id));
   // un tema PRO è ammesso solo con la firma (le anteprime dei non-PRO non vengono
@@ -697,5 +695,7 @@ function sanitizeSettings(s) {
   out.lang = LANGUAGES[out.lang] ? out.lang : "auto";
   // firma PRO opaca (solo segnale UI: le azioni critiche passano da verifyProLive)
   out[_PRO_SIG] = out[_PRO_SIG] === _PRO_OK ? _PRO_OK : null;
+  // toggle di sviluppo (Impostazioni → Info): si conserva solo nelle build locali
+  out._devPro = !!(s && s._devPro);
   return out;
 }

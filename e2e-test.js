@@ -580,6 +580,14 @@ async function main() {
   })()`);
   check("controlli avanzati renderizzati (URL sfondo, slider 0–24, valore, reset)", advControls === true);
 
+  // immagine di sfondo (URL): funzione PRO — per i free il campo è disabilitato
+  const bgLocked = await evaluate(optSess, `(() => {
+    const bg = document.getElementById('bgImage');
+    return !!bg && bg.disabled === true
+      && document.getElementById('bgImageLock').hidden === false;
+  })()`);
+  check("immagine di sfondo bloccata per i free (campo disabilitato + avviso PRO)", bgLocked === true);
+
   // 11a. slider: input → anteprima live, change → salvataggio
   const liveRadius = await waitFor(async () => {
     await evaluate(optSess, `(() => {
@@ -631,41 +639,31 @@ async function main() {
   });
   check("reset arrotondamento → 8px (slider, etichetta e storage)", resetRadius === true);
 
-  // 11c. immagine di sfondo: anteprima live, persistenza, propagazione alla dashboard
-  const bgLive = await waitFor(async () => {
+  // 11c. immagine di sfondo (PRO): per i free l'anteprima in pagina è consentita
+  // (transitoria) ma il valore non viene MAI conservato: la sanitizzazione del
+  // background lo rimuove, perché è una funzione PRO.
+  const bgNotSaved = await waitFor(async () => {
     await evaluate(optSess, `(() => {
       const bg = document.getElementById('bgImage');
       bg.value = 'https://example.com/bg.png';
       bg.dispatchEvent(new Event('input', { bubbles: true }));
+      bg.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     })()`);
-    const ok = await evaluate(optSess, `(() => {
-      const v = document.documentElement.style.getPropertyValue('--bg-img');
-      return v === 'url("https://example.com/bg.png")' ? true : null;
-    })()`);
-    return ok || null;
+    const s = await evaluate(optSess, `(async () => (await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})))).bgImage)()`);
+    return s === "" ? true : null;
   });
-  check("anteprima live sfondo (--bg-img url corretta)", bgLive === true);
+  check("per i free l'immagine di sfondo non viene conservata (funzione PRO)", bgNotSaved === true);
+
+  // pulizia: rimuove l'anteprima iniettata e ripristina lo stato pulito
   await evaluate(optSess, `(() => {
     const bg = document.getElementById('bgImage');
+    bg.value = '';
+    bg.dispatchEvent(new Event('input', { bubbles: true }));
     bg.dispatchEvent(new Event('change', { bubbles: true }));
     return true;
   })()`);
-  const bgSaved = await waitFor(async () => {
-    const s = await evaluate(optSess, `(async () => (await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})))).bgImage)()`);
-    return s === 'https://example.com/bg.png' ? s : null;
-  });
-  check("immagine di sfondo persistita (storage bgImage)", bgSaved === "https://example.com/bg.png", bgSaved || "");
-  const bgApplied = await waitFor(async () => {
-    const ok = await evaluate(dashSess, `(() => {
-      const v = document.documentElement.style.getPropertyValue('--bg-img');
-      return v === 'url("https://example.com/bg.png")' ? true : null;
-    })()`);
-    return ok || null;
-  });
-  check("sfondo applicato anche alla dashboard già aperta", bgApplied === true);
 
-  // 11d. l'URL dello sfondo non deve permettere CSS injection (doppi apici escapati)
   // 11d. l'URL dello sfondo non deve permettere CSS injection: i doppi apici interni
   // vengono escapati, quindi lo sfondo resta un unico url(...) e non nasce alcuna
   // nuova dichiarazione (es. un background-color rosso).
@@ -691,7 +689,8 @@ async function main() {
     return true;
   })()`);
 
-  // 11e. sanitizzazione lato background: clamp 0–24 e trim dell'URL
+  // 11e. sanitizzazione lato background: clamp 0–24; per i free la bgImage viene
+  // scartata (funzione PRO) — per i PRO il trim è coperto nel blocco PRO qui sotto
   const sanitized = await evaluate(optSess, `(async () => {
     const s = await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})));
     s.borderRadius = 99;
@@ -701,7 +700,7 @@ async function main() {
     const s2 = await new Promise(r => chrome.storage.local.get('settings', o => r(o.settings || {})));
     return resp && resp.ok ? { br: s2.borderRadius, bg: s2.bgImage } : null;
   })()`);
-  check("sanitizzazione: borderRadius clampato a 24, bgImage trimmata", !!sanitized && sanitized.br === 24 && sanitized.bg === "https://example.com/bg.png", sanitized ? JSON.stringify(sanitized) : "");
+  check("sanitizzazione: borderRadius clampato a 24, bgImage scartata per i free", !!sanitized && sanitized.br === 24 && sanitized.bg === "", sanitized ? JSON.stringify(sanitized) : "");
 
   /* ---------- 12. categorie + PRO (cold turkey, fasce orarie) ---------- */
   console.log("12. Categorie di siti e funzioni PRO");
@@ -808,36 +807,52 @@ async function main() {
   })()`);
   check("temi PRO: card renderizzate come nel registry", !!proThemeCount, "temi: " + proThemeCount);
 
-  // anteprima gratuita: il click su un tema PRO bloccato mostra la barra, applica
-  // il gradiente in memoria e NON persiste il tema nello storage
+  // anteprima gratuita dei temi PRO: il click apre la dashboard in una nuova
+  // scheda (?preview=pr-aurora) dove il tema è visibile in azione; NON persiste
   const themeBefore = await evaluate(optSess, `(async () =>
     (await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})))).theme)()`);
-  const previewShown = await waitFor(async () => {
-    const out = await evaluate(optSess, `(() => {
-      const card = document.querySelector('#proThemeGrid .theme-card.pro[data-pro-theme="pr-aurora"]');
-      const bar = document.getElementById("proPreviewBar");
-      const st = getComputedStyle(document.documentElement);
-      const gradOk = (st.getPropertyValue("--bg-grad") || "").includes("linear-gradient");
-      if (bar && bar.hidden && card) card.click(); // entra in anteprima solo se non già attiva
-      if (bar && bar.hidden === false && gradOk) return document.getElementById("proPreviewName").textContent;
-      return null;
-    })()`);
-    return out || null;
+  await evaluate(optSess, `(() => {
+    const card = document.querySelector('#proThemeGrid .theme-card.pro[data-pro-theme="pr-aurora"]');
+    if (card) card.click();
+    return true;
+  })()`);
+  const previewTabUrl = await waitFor(async () => {
+    const targets = await fetchJson("/json/list");
+    const t = targets.find(x => (x.url || "").includes("dashboard.html") && (x.url || "").includes("preview=pr-aurora"));
+    return t ? t.url : null;
   });
-  check("anteprima tema PRO per i free: barra visibile + gradiente applicato", previewShown === "Aurora", previewShown || "");
+  check("preview tema PRO: si apre la dashboard in una nuova scheda (?preview=pr-aurora)", !!previewTabUrl, previewTabUrl || "");
+  const previewApplied = await waitFor(async () => {
+    const targets = await fetchJson("/json/list");
+    const t = targets.find(x => (x.url || "").includes("dashboard.html") && (x.url || "").includes("preview=pr-aurora"));
+    if (!t) return null;
+    const sess = await attach(t.id);
+    const ok = await evaluate(sess, `(() => {
+      const grad = document.documentElement.style.getPropertyValue("--bg-grad") || "";
+      return grad.includes("linear-gradient")
+        && !document.getElementById("previewBanner").hidden
+        && document.getElementById("previewBannerName").textContent === "Aurora" ? true : null;
+    })()`);
+    return ok || null;
+  });
+  check("dashboard in anteprima: gradiente applicato + banner visibile", previewApplied === true);
+  const previewClosed = await waitFor(async () => {
+    const targets = await fetchJson("/json/list");
+    const t = targets.find(x => (x.url || "").includes("dashboard.html") && (x.url || "").includes("preview=pr-aurora"));
+    if (!t) return null;
+    const sess = await attach(t.id);
+    await evaluate(sess, `(() => { document.getElementById("previewBannerClose").click(); return true; })()`);
+    const ok = await evaluate(sess, `(() => {
+      const grad = document.documentElement.style.getPropertyValue("--bg-grad") || "";
+      return document.getElementById("previewBanner").hidden === true
+        && !grad.includes("linear-gradient") ? true : null;
+    })()`);
+    return ok || null;
+  });
+  check("chiusura anteprima: banner nascosto e gradiente rimosso", previewClosed === true);
   const themeAfter = await evaluate(optSess, `(async () =>
     (await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})))).theme)()`);
   check("l'anteprima non persiste il tema PRO", themeAfter === themeBefore, `prima: ${themeBefore} dopo: ${themeAfter}`);
-  const previewClosed = await waitFor(async () => {
-    await evaluate(optSess, `(() => { document.getElementById("proPreviewClose").click(); return true; })()`);
-    const out = await evaluate(optSess, `(() => {
-      const st = getComputedStyle(document.documentElement);
-      return document.getElementById("proPreviewBar").hidden === true
-        && !(st.getPropertyValue("--bg-grad") || "").includes("linear-gradient") ? true : null;
-    })()`);
-    return out || null;
-  });
-  check("chiusura anteprima: barra nascosta e gradiente rimosso", previewClosed === true);
 
   // la LISTA dei siti di ogni categoria è visibile anche gratis (espandendo la riga)
   const catListSeen = await waitFor(async () => {
@@ -870,15 +885,19 @@ async function main() {
     catGateFree && catGateFree.msg.length > 0 && catGateFree.noCustom === true,
     catGateFree ? JSON.stringify(catGateFree) : "");
 
-  // interfaccia di sblocco PRO (ExtensionPay): pulsanti presenti dietro il lucchetto
+  // interfaccia di sblocco PRO (ExtensionPay): nella sezione Membership ci sono
+  // stato del piano + pulsanti acquisto/login + elenco delle funzioni PRO
   const payUi = await evaluate(optSess, `(async () => {
-    const row = document.getElementById("proPayRow");
-    const unlock = document.getElementById("proUnlock");
-    const login = document.getElementById("proLogin");
-    return row && unlock && login && row.hidden === false
+    const row = document.querySelector("#membershipLocked .pro-pay-row");
+    const unlock = document.getElementById("mUnlock");
+    const login = document.getElementById("mLogin");
+    const state = document.getElementById("planName");
+    const feats = document.querySelectorAll("#membershipLocked .pro-features li").length;
+    return row && unlock && login && state && row.hidden === false
+      && state.textContent.trim().length > 0 && feats >= 4
       && unlock.textContent.trim().length > 0 && login.textContent.trim().length > 0;
   })()`);
-  check("UI di sblocco PRO presente (bottone acquisto + login)", payUi === true);
+  check("UI Membership: piano attuale + acquisto/login + elenco funzioni PRO", payUi === true);
 
   // build di sviluppo (EXT_PAY_ID vuoto): il click sul pulsante non apre pagine e mostra l'avviso
   const unconf = await evaluate(optSess, `(async () => {
@@ -914,23 +933,16 @@ async function main() {
   check("senza verifica live il cold turkey è rifiutato e la firma locale viene rimossa",
     forged && forged.ok !== true && forged.reason === "pro" && !forged.sig, forged ? JSON.stringify(forged) : "");
 
-  // toggle di sviluppo (Info) → strumenti PRO visibili e attivazione possibile
-  const devOn = await waitFor(async () => {
-    await evaluate(optSess, `(() => {
-      const t = document.getElementById("proTestToggle");
-      if (!t.checked) t.click();
-      return true;
-    })()`);
-    const r = await evaluate(optSess, `(async () => {
-      const d = await new Promise(r => chrome.storage.local.get("_devPro", o => r(o._devPro)));
-      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
-      return d === true && s._aT === "x8f9q" && document.getElementById("proTools").hidden === false ? true : null;
-    })()`);
-    return r || null;
-  });
-  check("toggle di sviluppo: strumenti PRO visibili", devOn === true);
+  // PRO attivabile solo con ExtensionPay configurato (EXT_PAY_ID): il toggle di
+  // sviluppo (Info) è stato rimosso, quindi senza ID le funzioni PRO restano
+  // bloccate e i test di attivazione qui sotto vengono saltati.
+  const proAvailable = await evaluate(optSess, `(async () => {
+    try { return typeof extpayConfigured === "function" && extpayConfigured(); }
+    catch { return false; }
+  })()`);
 
   // con PRO attivo un tema gradiente si applica e si salva (firma presente)
+  if (proAvailable) {
   const proThemeApplied = await waitFor(async () => {
     const out = await evaluate(optSess, `(async () => {
       const read = async () => {
@@ -951,6 +963,20 @@ async function main() {
     return out || null;
   });
   check("con PRO attivo il tema gradiente si applica e si salva", proThemeApplied === "pr-lagoon", proThemeApplied || "");
+
+  // PRO: l'immagine di sfondo (URL) si salva ed è trimmata
+  const bgSavedPro = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      const s = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      s.bgImage = "   https://example.com/bg.png   ";
+      const resp = await chrome.runtime.sendMessage({ type: "saveSettings", settings: s });
+      await new Promise(r => setTimeout(r, 400));
+      const s2 = await new Promise(r => chrome.storage.local.get("settings", o => r(o.settings || {})));
+      return resp && resp.ok && s2.bgImage === "https://example.com/bg.png" ? s2.bgImage : null;
+    })()`);
+    return r || null;
+  });
+  check("PRO: immagine di sfondo salvata e trimmata (storage bgImage)", bgSavedPro === "https://example.com/bg.png", bgSavedPro || "");
 
   // PRO: aggiunta di un dominio personalizzato a una categoria dall'interfaccia
   const catEdited = await waitFor(async () => {
@@ -1023,7 +1049,7 @@ async function main() {
     })()`);
     return r || null;
   });
-  check("riga del sito bloccata nell'interfaccia (toggle disabilitato + chip 🔒)", ctRowLocked === true);
+  check("riga del sito bloccata nell'interfaccia (toggle disabilitato + chip con lucchetto)", ctRowLocked === true);
 
   // il blocco ferreo ignora anche il periodo di grazia
   const ctTabId = await evaluate(optSess, `(async () => (await chrome.tabs.create({ url: "about:blank" })).id)()`);
@@ -1081,21 +1107,222 @@ async function main() {
     return href.includes("block.html") ? href : null;
   });
   check("dentro la fascia oraria il sito viene intercettato", !!schedBlock, schedBlock || "");
+  } else {
+    console.log("  …attivazione PRO saltata: EXT_PAY_ID non configurato in questa build (senza toggle di sviluppo)");
+  }
 
-  // pulizia: toggle di sviluppo spento → strumenti PRO di nuovo bloccati
-  await evaluate(optSess, `(() => {
-    const t = document.getElementById("proTestToggle");
-    if (t.checked) t.click();
-    return true;
-  })()`);
-  const devOff = await waitFor(async () => {
-    const r = await evaluate(optSess, `(async () => {
-      const d = await new Promise(r => chrome.storage.local.get("_devPro", o => r(o._devPro)));
-      return d !== true && document.getElementById("proLocked").hidden === false ? true : null;
+  /* ---------- 13. confronto settimanale (grafici) + coroncina Membership ---------- */
+  console.log("13. Confronto settimanale (grafici) e coroncina Membership");
+  const weekCmpOk = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      switchSection("stats");
+      document.getElementById("weekCmpOpen").click();
+      const dlg = document.getElementById("weekDialog");
+      if (!dlg || !dlg.open) return null;
+      const summary = document.querySelector(".week-cmp-summary");
+      const chartCols = document.querySelectorAll(".week-cmp-chart .bar-col").length;
+      const blocks = document.querySelectorAll(".week-cmp-block").length;
+      const miniCols = document.querySelectorAll(".week-cmp-block .week-cmp-mini .bar-col").length;
+      const label = (document.querySelector(".week-cmp-summary-label") || {}).textContent || "";
+      const legend = document.querySelectorAll(".week-cmp-summary .legend .lg").length;
+      return (summary && chartCols === 4 && blocks === 4 && miniCols === 28 && label && legend === 2)
+        ? { chartCols, blocks, miniCols, label: label.trim().slice(0, 40) }
+        : null;
     })()`);
     return r || null;
   });
-  check("toggle di sviluppo spento: strumenti PRO di nuovo bloccati", devOff === true);
+  check("confronto settimanale: grafico riassuntivo (4 settimane) + mini grafici (7 giorni × 4) + legenda",
+    !!weekCmpOk, weekCmpOk ? JSON.stringify(weekCmpOk) : "");
+  const weekCmpClosed = await evaluate(optSess, `(() => {
+    document.getElementById("weekCmpClose").click();
+    return !document.getElementById("weekDialog").open;
+  })()`);
+  check("dialog del confronto settimanale richiudibile (crocetta in alto a destra)", weekCmpClosed === true);
+
+  const weekCmpBackdrop = await evaluate(optSess, `(() => {
+    document.getElementById("weekCmpOpen").click();
+    const dlg = document.getElementById("weekDialog");
+    if (!dlg.open) return null;
+    const hasCancel = !!document.querySelector("#weekDialog .d-actions");
+    const hasX = !!document.querySelector("#weekDialog .dlg-close");
+    dlg.dispatchEvent(new MouseEvent("click", { bubbles: true })); // click sul backdrop
+    return !dlg.open && !hasCancel && hasX ? true : null;
+  })()`);
+  check("dialog: click fuori lo chiude, senza bottone Annulla, con crocetta", weekCmpBackdrop === true);
+
+  const navClean = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      const btn = document.querySelector('nav button[data-sec="membership"]');
+      if (!btn) return null;
+      const after = getComputedStyle(btn, "::after");
+      return !btn.querySelector(".nav-crown")
+          && (after.content === "none" || after.backgroundImage === "none")
+        ? true
+        : null;
+    })()`);
+    return r || null;
+  });
+  check("voce Membership: nessuna decorazione (né corona né sottolineato)", navClean === true);
+
+  /* ---------- 14. toggle PRO di sviluppo + editor fasce orarie + Avanzate ---------- */
+  console.log("14. Toggle PRO di sviluppo, editor fasce orarie, card Avanzate");
+
+  // il toggle di sviluppo sta in Info: lo attiva e sblocca le funzioni PRO in locale
+  const devOn = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      switchSection("info");
+      const tgl = document.getElementById("proDevToggle");
+      if (!tgl) return null;
+      tgl.checked = true;
+      tgl.dispatchEvent(new Event("change", { bubbles: true }));
+      for (let i = 0; i < 12; i++) {
+        await new Promise(r2 => setTimeout(r2, 200));
+        const s = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
+        if (s._devPro === true && s._aT === _PRO_OK) return true;
+      }
+      return null;
+    })()`);
+    return r || null;
+  });
+  check("toggle PRO di sviluppo: attiva la firma PRO in locale (Info)", devOn === true);
+
+  const proUnlocked = await waitFor(async () => {
+    const r = await evaluate(optSess, `(() => {
+      switchSection("focus");
+      return !document.getElementById("proTools").hidden
+          && document.getElementById("proLocked").hidden
+          && document.getElementById("membershipActive").hidden === false
+        ? true : null;
+    })()`);
+    return r || null;
+  });
+  check("con il toggle attivo le funzioni PRO si sbloccano (Focus + Membership Lifetime)", proUnlocked === true);
+
+  // card Avanzate: contiene una funzione PRO (immagine di sfondo URL) → bordo a gradiente
+  const advGrad = await evaluate(optSess, `(() => {
+    switchSection("appearance");
+    const c = document.getElementById("advancedCard");
+    if (!c) return null;
+    return getComputedStyle(c).backgroundImage.includes("conic-gradient") ? true : null;
+  })()`);
+  check("card Avanzate con bordo a gradiente PRO (funzione PRO interna)", advGrad === true);
+
+  // salvataggio di una fascia dalla UI (giorni + orari) con il toggle attivo
+  const schedSaved = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      switchSection("focus");
+      const s = settings.sites.find(x => String(x.id) === "1") || settings.sites[0];
+      if (!s) return null;
+      const sel = document.getElementById("schedTarget");
+      sel.value = "site:" + s.id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      schedDraft = { target: sel.value, days: [1, 3], start: 8 * 60 + 30, end: 17 * 60 + 45 };
+      renderSchedEditor();
+      document.getElementById("schedSave").click();
+      for (let i = 0; i < 12; i++) {
+        await new Promise(r2 => setTimeout(r2, 200));
+        const st = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
+        const site = st.sites.find(x => String(x.id) === "1");
+        const sc = site && site.schedule;
+        if (sc && sc.days.join(",") === "1,3" && sc.start === 510 && sc.end === 1065) return true;
+      }
+      return null;
+    })()`);
+    return r || null;
+  });
+  check("fascia salvata dalla UI (lun+mer 08:30–17:45) con il toggle PRO attivo", schedSaved === true);
+
+  // selezione stabile: un blocco ferreo scaduto non azzera più i giorni dopo ~1 s
+  const schedStable = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      const s = settings.sites.find(x => String(x.id) === "1") || settings.sites[0];
+      if (!s) return null;
+      s.ctUntil = Date.now() - 1000; // blocco ferreo appena scaduto
+      // parte da una selezione pulita, così il click accende i giorni
+      schedDraft = { target: document.getElementById("schedTarget").value, days: [], start: 9 * 60, end: 18 * 60 };
+      renderPro();
+      await new Promise(r2 => setTimeout(r2, 300));
+      const chips = document.querySelectorAll("#schedDays .day-chip");
+      if (!chips.length) return null;
+      chips[0].click();
+      chips[2].click();
+      const before = [...document.querySelectorAll("#schedDays .day-chip.on")].map(c => c.dataset.d).join(",");
+      await new Promise(r2 => setTimeout(r2, 2200)); // supera il tick da 1 s
+      const after = [...document.querySelectorAll("#schedDays .day-chip.on")].map(c => c.dataset.d).join(",");
+      return { before, after };
+    })()`);
+    return r ? r : null;
+  });
+  check("giorni selezionati: restano selezionati dopo la scadenza di un blocco ferreo",
+    !!(schedStable && schedStable.before && schedStable.before === schedStable.after),
+    schedStable ? JSON.stringify(schedStable) : "");
+
+  const schedTimesOk = await evaluate(optSess, `(async () => {
+    // il campo orario (select ora/minuti, niente input[type=time] nativo) riprende
+    // gli orari e i giorni salvati
+    renderSchedEditor();
+    const s = settings.sites.find(x => String(x.id) === "1") || settings.sites[0];
+    if (!s) return null;
+    s.schedule = { days: [1, 3], start: 8 * 60 + 30, end: 17 * 60 + 45 };
+    schedDraft = null;
+    renderSchedEditor();
+    const start = document.getElementById("schedStartH").value + ":" + document.getElementById("schedStartM").value;
+    const end = document.getElementById("schedEndH").value + ":" + document.getElementById("schedEndM").value;
+    const on = [...document.querySelectorAll("#schedDays .day-chip.on")].map(c => c.dataset.d).join(",");
+    const nativeTimes = document.querySelectorAll(".pro-tool input[type=time]").length;
+    return start === "8:30" && end === "17:45" && on === "1,3" && nativeTimes === 0 ? { start, end, on } : null;
+  })()`);
+  check("orari e giorni salvati ripresi nell'editor (8:30–17:45, lun+mer), senza input[type=time]", !!schedTimesOk, schedTimesOk ? JSON.stringify(schedTimesOk) : "");
+
+  // disattivazione: la firma PRO viene rimossa e la UI torna bloccata
+  const devOff = await waitFor(async () => {
+    const r = await evaluate(optSess, `(async () => {
+      switchSection("info");
+      const tgl = document.getElementById("proDevToggle");
+      if (!tgl) return null;
+      tgl.checked = false;
+      tgl.dispatchEvent(new Event("change", { bubbles: true }));
+      for (let i = 0; i < 12; i++) {
+        await new Promise(r2 => setTimeout(r2, 200));
+        const s = await new Promise(r2 => chrome.storage.local.get("settings", o => r2(o.settings || {})));
+        if (s._devPro === false && !s._aT) return true;
+      }
+      return null;
+    })()`);
+    return r || null;
+  });
+  check("toggle disattivato: firma PRO rimossa e UI di nuovo bloccata", devOff === true);
+
+  // stile Membership: corona del piano neutra ≠ corona dorata PRO; scritta del
+  // pulsante Unlock sempre leggibile (colore fisso, non l'accento del tema)
+  const memStyle = await evaluate(optSess, `(() => {
+    const planCrown = document.querySelector(".plan-state .plan-ico");
+    const proCrown = document.querySelector(".pro-box-head .crown");
+    const btn = document.getElementById("mUnlock");
+    if (!planCrown || !proCrown || !btn) return null;
+    const planColor = getComputedStyle(planCrown).color;
+    const proColor = getComputedStyle(proCrown).color;
+    const btnColor = getComputedStyle(btn).color;
+    const shine = getComputedStyle(btn, "::after").content !== "none";
+    const hintGone = !document.querySelector("#membershipCard [data-i18n=membership_hint]");
+    return (planColor !== proColor && btnColor === "rgb(20, 10, 36)" && shine && hintGone)
+      ? { planColor, proColor, btnColor }
+      : null;
+  })()`);
+  check("Membership: corona piano neutra ≠ corona PRO, scritta Unlock a colore fisso, riflesso hover, hint rimosso",
+    !!memStyle, memStyle ? JSON.stringify(memStyle) : "");
+
+  // card PRO in Focus: badge centrato col titolo e pulsante distanziato dalla descrizione
+  const proCardFix = await evaluate(optSess, `(() => {
+    const h2 = document.querySelector("#proCard .pro-head h2");
+    const btn = document.getElementById("proGoMembership");
+    if (!h2 || !btn) return null;
+    const h2Margin = getComputedStyle(h2).marginBottom;
+    const btnMargin = getComputedStyle(btn).marginTop;
+    return h2Margin === "0px" && btnMargin === "14px" ? { h2Margin, btnMargin } : null;
+  })()`);
+  check("card PRO (Focus): badge centrato col titolo, pulsante distanziato dalla descrizione",
+    !!proCardFix, proCardFix ? JSON.stringify(proCardFix) : "");
 
   console.log(`\nRisultato: ${passed} passati, ${failed} falliti`);
   return failed === 0 ? 0 : 1;

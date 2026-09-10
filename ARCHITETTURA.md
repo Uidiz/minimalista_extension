@@ -46,18 +46,35 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   arriva dalla cache di Chrome (`_favicon`, permesso "favicon": nessuna richiesta di rete),
   con l'iniziale del nome come fallback se il sito non è mai stato visitato. Modalità
   "modifica" per aggiungere/rimuovere.
+- **Preferiti nascosti dal Focus**: con la Modalità Focus **attiva**, i preferiti che fanno
+  parte della lista Focus vengono nascosti dalla griglia ("lontano dagli occhi, lontano dal
+  cuore"); un hint segnala quanti sono nascosti e in modalità modifica riappaiono (per
+  poterli rimuovere).
 - Le **sezioni della nuova scheda** (barra di ricerca, ToDo, Preferiti, Focus) si possono
   nascondere singolarmente da Impostazioni → Home (`showSearch`/`showTodo`/`showFavorites`/
   `showFocus`): nascondere non disattiva nulla, il Focus continua a bloccare.
-- Riepilogo **Focus**: siti limitati con i relativi tempi, interruttore globale, statistiche del giorno.
+- Riepilogo **Focus**: siti limitati con i relativi tempi, interruttore globale, statistiche
+  del giorno con **navigazione nello storico**: due frecce (‹ ›) ai lati dell'etichetta
+  ("Oggi", "Ieri", data) esplorano i giorni passati e aggiornano tempi e contatori.
 
 ### 2.3 Statistiche
 - Il tempo viene tracciato su **ogni sito web** (http/https attivo nella finestra a fuoco) e
   suddiviso in due categorie: **siti distraenti** (quelli del Focus) e **altri siti**.
 - Grafico a barre degli **ultimi 7 giorni** con due serie per giorno (distraenti vs altri siti)
   e confronto dei soli siti distraenti con la settimana precedente (trend %).
+- **Navigazione nello storico**: nella sezione Statistiche (impostazioni) le frecce ‹ › ai
+  lati dell'etichetta del giorno spostano l'intera vista nel passato: il grafico mostra i
+  7 giorni che finiscono nel giorno selezionato, "Top siti" e i contatori mostrano quel giorno.
 - **Top siti del giorno** con percentuali (i siti del Focus sono evidenziati con un pallino).
 - Contatori di **tentativi bloccati** e **aperture deliberate** (sblocchi avvenuti), giornalieri e settimanali.
+- **Confronto settimanale**: la card "Tempo di navigazione" è cliccabile e apre un dialog
+  con le ultime 4 settimane, graficamente allo stesso livello della card "ultimi 7 giorni":
+  un grafico riassuntivo confronta le 4 settimane (barre accatastate distraenti/altri con
+  totale e data) e ogni settimana mostra il mini grafico dei suoi 7 giorni + top siti con
+  percentuali e blocchi/sblocchi. Il dialog si chiude con la **crocetta in alto a destra**
+  oppure cliccando **fuori di esso** (backdrop). Nota: il modello dati non traccia le ore
+  della giornata, quindi il confronto copre il tempo per sito e i contatori, non le
+  "fasce orarie" orarie.
 - Comando di azzeramento.
 
 ### 2.4 Personalizzazione
@@ -65,6 +82,9 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   con nome personalizzato. Ogni tema custom ha **tre colori principali** (sfondo, testo, accento)
   scelti con `<input type="color">` nativo oppure digitando l'**hex** esatto; card, muted e border
   sono derivati per interpolazione. I temi custom si possono creare, rinominare, modificare ed eliminare.
+  L'editor ha anche un campo **Immagine di sfondo (URL)** (PRO): l'URL viene salvato dentro il
+  tema (`customThemes[].bgImage`) e ha la precedenza sull'immagine globale di Aspetto → Avanzate;
+  per i non-PRO il campo resta disabilitato e la sanitizzazione lo scarta.
 - Dimensione globale del font (60–120%) e stile (Sans Serif, Serif, Monospace, Corsivo).
 - Mostra/nascondi i secondi sull'orologio.
 - **Lingua dell'interfaccia**: automatica (lingua del browser se supportata) oppure manuale tra
@@ -73,11 +93,19 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 - **Motore di ricerca** della barra in nuova scheda (Google, DuckDuckGo, Bing, Brave), in Aspetto.
 - Mostra/nascondi la **barra di ricerca web** sulla nuova scheda (Aspetto → Nuova scheda).
 - **Collegamenti rapidi (PRO)** in alto a destra della nuova scheda (come i link Gmail/Immagini della home di Google): scelti in Aspetto → Collegamenti rapidi tra un catalogo preselezionato (Gmail, Immagini, Maps, YouTube, Calendar, Drive, News, Traduttore) oppure voci personalizzate nome + URL; si aprono in una nuova scheda. Mostrati solo con la firma PRO (`settings.shortcuts`, default: Gmail + Immagini).
-- **Immagine di sfondo e arrotondamento bordi** (Aspetto → Avanzate): URL di un'immagine di
-  sfondo in copertura fissa (tutte le pagine tranne la pagina di blocco, che non carica
-  `common.css`) e raggio degli angoli dell'interfaccia (0–24 px) esposto come CSS variable
-  `--border-radius`; card e dialog lo derivano con `calc()` per mantenere le proporzioni.
-  L'URL viene sanificato contro la CSS injection prima di essere iniettato in `--bg-img`.
+- **Immagine di sfondo (PRO) e arrotondamento bordi** (Aspetto → Avanzate): l'URL di
+  un'immagine di sfondo in copertura fissa (tutte le pagine tranne la pagina di blocco, che
+  non carica `common.css`) è una **funzione PRO**: per i free il campo è disabilitato con un
+  avviso e la sanitizzazione del background scarta il valore. La card "Avanzate" porta lo
+  stesso **bordo a gradiente conico animato** delle card PRO, perché contiene una funzione
+  PRO. Il raggio degli angoli dell'interfaccia (0–24 px) resta per tutti, esposto come CSS
+  variable `--border-radius`; card e dialog lo derivano con `calc()` per mantenere le
+  proporzioni. L'URL viene sanificato contro la CSS injection prima di essere iniettato in
+  `--bg-img`.
+- **Anteprima dei temi PRO**: per i non-PRO il click su un tema PRO (in Aspetto) **apre la
+  dashboard in una nuova scheda** (`dashboard.html?preview=<id>`) dove il tema è visibile in
+  azione con un banner "Anteprima tema PRO"; chiudendo il banner si torna al tema normale.
+  Il tema non viene mai persistito senza la firma.
 - **Sezione Impostazioni "Home"**: raccoglie tutto ciò che riguarda la nuova scheda — sezioni
   visibili/nascoste (ricerca, ToDo, Preferiti, Focus), motore di ricerca, secondi
   dell'orologio e i collegamenti rapidi PRO (in precedenza in Aspetto).
@@ -115,7 +143,9 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 ### 2.7 Categorie di siti (per tutti i piani)
 - Sei macro-categorie precompilate (Social, Video, News, Adulti, Giochi, Shopping) con domini
   **disgiunti** tra loro: registry `CATEGORIES` in `common.js`, configurazione per categoria in
-  `settings.categories`. Ogni categoria ha toggle attivo/inattivo, modalità "tieni premuto"/
+  `settings.categories`. I domini di default sono **internazionali** (niente siti solo-italiani:
+  es. `bbc.com`, `cnn.com`, `reuters.com`, `wired.com` per le Notizie e `amazon.com`,
+  `ebay.com`, `zalando.com`, `etsy.com` per lo Shopping). Ogni categoria ha toggle attivo/inattivo, modalità "tieni premuto"/
   "blocca", ritardo e limite giornaliero, come i singoli siti.
 - Il limite di categoria è un **budget aggregato**: conta i minuti spesi su *tutti* i domini
   della categoria (il tracker li registra sul dominio canonico, così il calcolo è immediato).
@@ -135,6 +165,13 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
 - **Fasce orarie settimanali** (per sito o categoria): finestre di attivazione del blocco
   (giorni della settimana + orario, es. lun–ven 09:00–18:00). Fuori fascia il target non
   viene intercettato; dentro fascia si comporta secondo la sua modalità di base.
+- **Editor delle fasce**: i giorni sono chip toggle; l'orario usa un campo tematizzato
+  (due "pill" `ora : minuti` fatte di select, al posto dei nativi `input[type=time]` che
+  non seguivano i colori del tema). La selezione non salvata vive in una **bozza**
+  (`schedDraft`): sopravvive ai ri-render della pagina finché non viene salvata o si cambia
+  destinazione; i blocchi ferrei **scaduti** vengono ripuliti una sola volta dal tick dei
+  countdown (in passato ogni tick ri-renderizzava le sezioni PRO, azzerando la selezione
+  dei giorni dopo ~1 s).
 - L'attivazione di entrambe passa da una **verifica live** dello stato PRO (sezione 5.9).
 
 ### 2.9 Modalità in incognito
@@ -156,15 +193,25 @@ attivo: se non vuoi blocchi immediati, spegni l'interruttore Focus dal popup o d
   (spunta "Consenti in incognito"). Scelta voluta: il banner compare **solo** con la categoria
   Adulti attiva (chi blocca siti per adulti è chi più spesso naviga in incognito).
 
-### 2.10 Pagamenti PRO (ExtensionPay)
+### 2.10 Pagamenti PRO (ExtensionPay) e sezione Membership
 - L'acquisto (piano **Lifetime**) è gestito da **ExtensionPay**: la libreria `ExtPay.js` è
   inclusa nel progetto (vendored dal pacchetto npm `extpay` v3.1.2, licenza AGPL-3.0) e
   inizializzata nel service worker (`startBackground`) e nelle impostazioni con l'ID
   registrato su extensionpay.com (`EXT_PAY_ID` in `common.js`).
-- Dietro il lucchetto PRO: bottone **"Sblocca PRO (Lifetime)"** → `extpay.openPaymentPage()`
-  e **"Ho già pagato? Accedi"** → `extpay.openLoginPage()`. Dopo il pagamento la pagina
-  impostazioni interroga lo stato con un polling breve: i lucchetti spariscono all'istante
-  e compare il messaggio di ringraziamento.
+- **Sezione "Membership"** (menu laterale, sopra Info): consolida in un unico posto
+  l'upsell — stato del piano (Free/Lifetime), pulsanti **"Sblocca PRO (Lifetime)"**
+  (`extpay.openPaymentPage()`) e **"Ho già pagato? Accedi"** (`extpay.openLoginPage()`)
+  e l'elenco pulito delle funzioni PRO con **icone SVG monocromatiche** (niente emoji).
+  Il **piano attuale** (Free/Lifetime) vive in un pannello neutro separato (corona
+  neutra, diversa dalla corona dorata del riquadro PRO); il **riquadro a gradiente
+  animato** è riservato alle cose PRO (offerta con funzioni e pulsanti, oppure conferma
+  "PRO Lifetime attivo"): così il multicolore non convive più con la scritta "Free". Il
+  pulsante **"Sblocca PRO"** ha la scritta a colore fisso (`#140a24`) — l'hover globale
+  dei bottoni non la sovrascrive più con l'accento del tema — e al passaggio mostra un
+  riflesso animato. La voce di menu "Membership" resta senza decorazioni. Nella card PRO
+  di Focus resta solo un rimando compatto alla Membership.
+- Dopo il pagamento la pagina impostazioni interroga lo stato con un polling breve: i
+  lucchetti spariscono all'istante e compare il messaggio di ringraziamento.
 - Viene verificato **solo lo stato di pagamento** (nessun contenuto personale). Nessun
   `content_scripts` su extensionpay.com: niente permessi aggiuntivi in fase di installazione
   (il real-time usa polling, non push).
@@ -227,7 +274,8 @@ settings: {
     active: boolean               // toggle per-sito
   }],
   theme: "midnight" | "eink" | "neon" | "warm" | "ocean" | "sunset" | idCustomTheme,
-  customThemes: [{ id, name, bg, fg, accent }],  // temi custom salvati (3 colori ognuno)
+  customThemes: [{ id, name, bg, fg, accent, bgImage }],  // temi custom salvati (3 colori ognuno)
+              // + bgImage (PRO): URL immagine di sfondo associata al tema ("" = nessuna)
   searchEngine: "google" | "duckduckgo" | "bing" | "brave",  // motore di ricerca della barra
   showSearch: boolean,            // mostra/nascondi la barra di ricerca nella nuova scheda
   showTodo: boolean,              // mostra/nascondi la card ToDo nella nuova scheda (default true)
@@ -244,7 +292,8 @@ settings: {
   fontFamily: "sans" | "serif" | "mono" | "cursive",
   showSeconds: boolean,
   lang: "auto" | "it" | "en" | "es" | "fr" | "de" | "pt",  // lingua UI; "auto" = lingua del browser
-  bgImage: string,                // URL immagine di sfondo ("" = nessuna) — Aspetto → Avanzate
+  bgImage: string,                // PRO: URL immagine di sfondo ("" = nessuna) — Aspetto → Avanzate;
+                                // senza firma PRO la sanitizzazione la scarta sempre
   borderRadius: number,           // arrotondamento UI in px (0–24, default 8)
   categories: [{                  // configurazione per categoria (fusa col registry CATEGORIES)
     id: "social"|"video"|"news"|"adulti"|"gaming"|"shopping",
@@ -269,11 +318,6 @@ stats: {
   blocked: { "YYYY-MM-DD": count },                   // tentativi intercettati
   unlocks: { "YYYY-MM-DD": count }                    // sblocchi completati
 }
-```
-
-Altre chiavi di `chrome.storage.local`:
-```js
-_devPro: boolean   // toggle di sviluppo PRO (Info → "PRO — solo sviluppo"): da rimuovere prima della pubblicazione
 ```
 
 Stato volatile (`chrome.storage.session`):
@@ -305,8 +349,9 @@ grace: { [tabId]: timestampScadenza }   // periodi di grazia attivi per scheda
                  │   stats.byDay[data][dominio] += secondi        │
                  │                                                │
    messaggi ────▶ onMessage: getState | saveSettings | setFocus |  │
-                 │            unlock | resetStats | proTest |      │
-                 │            coldTurkey | proSchedule | proRefresh│
+                 │            unlock | resetStats | coldTurkey |     │
+                 │            proSchedule | proSaveCategories |      │
+                 │            proRefresh                           │
                  └──────────────────────────────────────────────┘
                         ▲                        ▲
        chrome.storage   │                        │   chrome.storage.session
@@ -474,15 +519,19 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
 - **La UI legge solo la firma locale**: `isPro(settings)` controlla che
   `settings._aT === "x8f9q"`. La firma fa sparire i lucchetti e mostra gli strumenti PRO,
   ma **non concede nulla**: chi la falsifica nello storage non ottiene poteri.
-- **Le azioni critiche passano da `verifyProLive()`** nel background (`coldTurkey` e
-  `proSchedule` la invocano prima di scrivere):
-  1. il toggle di sviluppo `_devPro` (Info, da rimuovere prima della pubblicazione) approva;
-  2. altrimenti `ExtPay(EXT_PAY_ID).getUser()` interroga extensionpay.com: se `user.paid` è
-     true l'azione parte e la firma viene riallineata a `_aT = "x8f9q"`;
-  3. ogni "no" definitivo (non pagato, oppure ExtensionPay non configurato) **rimuove la
+- **Le azioni critiche passano da `verifyProLive()`** nel background (`coldTurkey`,
+  `proSchedule` e `proSaveCategories` la invocano prima di scrivere):
+  1. `ExtPay(EXT_PAY_ID).getUser()` interroga extensionpay.com: se `user.paid` è true
+     l'azione parte e la firma viene riallineata a `_aT = "x8f9q"`;
+  2. ogni "no" definitivo (non pagato, oppure ExtensionPay non configurato) **rimuove la
      firma** (revoca della UI) e rifiuta l'operazione con `reason: "pro"`;
-  4. un errore di rete è **fail-closed**: l'operazione è rifiutata ma l'ultimo stato noto
+  3. un errore di rete è **fail-closed**: l'operazione è rifiutata ma l'ultimo stato noto
      della UI non viene toccato (un utente pagato non viene "sloggato" per un calo di rete).
+  Con **ExtensionPay non configurato** le azioni PRO restano bloccate per chiunque, tranne
+  quando è attivo il **toggle di sviluppo** (Impostazioni → Info → "PRO — solo sviluppo"):
+  in quella build `verifyProLive()` e `refreshProStatus()` rispondono true senza interrogare
+  il server e `sanitizeSettings` conserva il flag `_devPro`. È un espediente SOLO per lo
+  sviluppo locale: va rimosso prima della pubblicazione (checklist in `TODO.md`).
 - **Allineamento automatico**: `refreshProStatus()` interroga ExtensionPay all'avvio del
   service worker, all'installazione e all'avvio del browser, riallineando la firma UI allo
   stato reale; la pagina impostazioni può richiederlo esplicitamente col messaggio
@@ -491,8 +540,8 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
   "Ho già pagato? Accedi" → `extpay.openLoginPage()`. Mentre la scheda di pagamento è
   aperta la pagina impostazioni fa un polling breve di `getUser()`; appena risulta pagato
   invia `proRefresh`, aggiorna la UI (lucchetti rimossi) e mostra il ringraziamento.
-- **Messaggi**: `proTest` (toggle di sviluppo), `proRefresh` (riallineamento richiesto),
-  `coldTurkey` e `proSchedule` (azioni critiche, sempre dietro `verifyProLive`).
+- **Messaggi**: `proRefresh` (riallineamento richiesto), `coldTurkey`, `proSchedule` e
+  `proSaveCategories` (azioni critiche, sempre dietro `verifyProLive`).
 
 ---
 
@@ -525,8 +574,8 @@ grazia (il limite ha priorità su tutto). Il tempo continua comunque a essere tr
   (vendored dal pacchetto npm `extpay` v3.1.2, **licenza AGPL-3.0**) comunica solo con
   `extensionpay.com`. Chrome Web Store non offre acquisti in-app nativi, quindi l'acquisto
   Lifetime avviene sulla pagina di pagamento ExtensionPay/Stripe. `EXT_PAY_ID` vuoto
-  (= non ancora registrati su extensionpay.com) disabilita ExtensionPay: in sviluppo le
-  funzioni PRO si testano col toggle in Info.
+  (= non ancora registrati su extensionpay.com) disabilita ExtensionPay: senza ID le
+  funzioni PRO restano bloccate (nessun toggle di sviluppo: va registrata l'estensione).
 - **Verifica PRO fail-closed**: un errore di rete non approva mai un'azione critica e non
   tocca lo stato UI; un "non pagato" (o ExtensionPay assente) rimuove anche la firma
   locale falsificata. Falsificare `chrome.storage.local` non sblocca nulla.
@@ -569,13 +618,18 @@ node e2e-test.js
  11. **personalizzazione avanzata**: card "Avanzate" (URL sfondo + slider 0–24 + reset),
      anteprima live del raggio (variabile CSS e card derivate), persistenza, propagazione
      alla dashboard già aperta, sicurezza dell'URL (niente CSS injection) e sanitizzazione;
+     l'immagine di sfondo è PRO: campo bloccato per i free, valore scartato dalla
+     sanitizzazione;
  12. **categorie**: 6 categorie renderizzate e sanitizzate, attivazione dall'interfaccia,
      intercettazione di un dominio membro, **budget aggregato superato** → blocco
      `r=limit&c=video`;
- 13. **PRO**: strumenti bloccati senza abbonamento, UI di sblocco (bottone acquisto + login),
-     firma falsificata rifiutata e revocata, avviso in build senza `EXT_PAY_ID`, `proRefresh`
-     senza ExtensionPay, toggle di sviluppo, cold turkey dall'interfaccia (riga disabilitata
-     + chip 🔒, override del periodo di grazia con `r=ct`), fasce orarie dentro/fuori finestra.
+ 13. **PRO**: strumenti bloccati senza abbonamento, UI Membership (piano + acquisto/login +
+     elenco funzioni con icone SVG), preview dei temi PRO che apre la dashboard in una nuova
+     scheda (`?preview=`), firma falsificata rifiutata e revocata, avviso in build senza
+     `EXT_PAY_ID`, `proRefresh` senza ExtensionPay. Le azioni PRO attive (cold turkey con
+     chip 🔒 e `r=ct`, fasce orarie dentro/fuori finestra, categorie personalizzate, sfondo)
+     si testano solo con ExtensionPay configurato (senza EXT_PAY_ID non esiste più un modo
+     di attivare PRO: il toggle di sviluppo è stato rimosso).
      (Il banner incognito non è coperto: non è simulabile in Chrome for Testing.)
 - Richiede Node ≥ 22 (fetch + WebSocket globali).
 - Se `CHROME_BIN` è impostato, usa quel binario invece di Chrome for Testing.

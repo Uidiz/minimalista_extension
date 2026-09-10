@@ -9,6 +9,13 @@
 <body>
   <div class="bg-aurora" aria-hidden="true"><i class="blob blob-a"></i><i class="blob blob-b"></i><i class="blob blob-c"></i></div>
 
+  <div id="previewBanner" class="preview-banner" hidden>
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7z"/><path d="M19 14.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/></svg>
+    <span data-i18n="preview_banner_label">Anteprima tema PRO:</span>
+    <strong id="previewBannerName"></strong>
+    <button type="button" id="previewBannerClose" data-i18n="preview_banner_close">Chiudi anteprima</button>
+  </div>
+
   <div class="phone">
 
     <header>
@@ -44,6 +51,7 @@
         <button id="favEdit" class="ghost" data-i18n="fav_edit">modifica</button>
       </div>
       <div id="favList"></div>
+      <p class="fav-hidden-hint" id="favHiddenHint" hidden></p>
       <form id="favAdd" autocomplete="off" hidden>
         <input id="favName" placeholder="Nome (es. Mail)" data-i18n-ph="fav_name_ph">
         <input id="favUrl" placeholder="https://…" data-i18n-ph="fav_url_ph">
@@ -57,6 +65,11 @@
         <label class="switch"><input type="checkbox" id="focusToggle" aria-label="Modalità Focus" data-i18n-aria="focus_mode"><span class="slider"></span></label>
       </div>
       <div id="focusSites"></div>
+      <div class="day-nav" id="statsDayNav">
+        <button type="button" id="statsPrev" class="day-arrow" aria-label="Giorno precedente" data-i18n-aria="stats_day_prev_aria">‹</button>
+        <span id="statsDayLabel" class="day-label">Oggi</span>
+        <button type="button" id="statsNext" class="day-arrow" aria-label="Giorno successivo" data-i18n-aria="stats_day_next_aria">›</button>
+      </div>
       <div id="todayStats"></div>
     </section>
 

@@ -4,6 +4,13 @@
 let settings = null;
 const el = (id) => document.getElementById(id);
 
+// Icone SVG monocromatiche (spessore sottile) usate nella UI PRO al posto delle
+// emoji: lucchetto per i blocchi ferrei, orologio per le fasce orarie.
+const ICO = {
+  lock: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+};
+
 /* ============================================================
    Avvio: carica le impostazioni e mostra la pagina
    ============================================================ */
@@ -134,7 +141,8 @@ function renderAll() {
   renderSearchToggle();
   renderHomeSectionsToggles();
   renderBgMotion();
-  renderDev();
+  renderMembership();
+  renderProDev();
   renderStats();
   el("focusToggle").checked = settings.focusEnabled;
 }
@@ -146,8 +154,8 @@ function renderSites() {
   rows.innerHTML = settings.sites.map(s => {
     const inCt = (s.ctUntil || 0) > now;
     const chips =
-      (inCt ? `<span class="chip ct-chip" data-until="${s.ctUntil}">🔒 ${esc(ctRemainingLabel(s.ctUntil))}</span>` : "") +
-      (s.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(s.schedule))}">🕒</span>` : "");
+      (inCt ? `<span class="chip ct-chip" data-until="${s.ctUntil}">${ICO.lock} ${esc(ctRemainingLabel(s.ctUntil))}</span>` : "") +
+      (s.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(s.schedule))}">${ICO.clock}</span>` : "");
     const dis = inCt ? " disabled" : "";
     return `
     <div class="site-row ${inCt ? "ct-locked" : ""}" data-id="${s.id}">
@@ -249,7 +257,6 @@ function renderTheme() {
 
   grid.querySelectorAll(".theme-card[data-theme]").forEach(card => {
     card.addEventListener("click", async (e) => {
-      exitProPreview(); // scegliere un tema normale chiude l'eventuale anteprima PRO
       const id = card.dataset.theme;
       if (e.target.closest(".t-del")) {
         removeCustomTheme(id); // ✕ della card: elimina senza selezionare
@@ -259,28 +266,17 @@ function renderTheme() {
       save(); // updateThemeSelection apostera l'editor sul tema scelto
     });
   });
-  el("themeNewCard").addEventListener("click", () => {
-    exitProPreview();
-    openCustomEditor(null);
-  });
+  el("themeNewCard").addEventListener("click", () => openCustomEditor(null));
 
   renderProThemes();
-  bindProPreviewBar();
   updateThemeSelection();
 }
 
-/* ---------------- temi PRO (gradienti) + anteprima per i non-PRO ------------- */
-let proPreviewThemeId = null; // tema PRO in anteprima (solo memoria, mai salvato)
-let previewBarBound = false;
+/* ---------------- temi PRO (gradienti) ---------------- */
 
-// Applica il tema corrente: se c'è un'anteprima PRO attiva la forza (anche per i
-// non-PRO), altrimenti il tema regolare di settings.
+// Applica il tema corrente di settings.
 function applyCurrentTheme() {
-  if (proPreviewThemeId) {
-    applyTheme(document.documentElement, { ...settings, theme: proPreviewThemeId }, true);
-  } else {
-    applyTheme(document.documentElement, settings);
-  }
+  applyTheme(document.documentElement, settings);
 }
 
 function renderProThemes() {
@@ -290,11 +286,10 @@ function renderProThemes() {
   const unlocked = isPro(settings);
   grid.innerHTML = PRO_THEME_IDS.map(id => {
     const t = PRO_THEMES[id];
-    const prev = proPreviewThemeId === id;
     const grad = `linear-gradient(160deg, ${t.grad[0]}, ${t.grad[1]})`;
     return `
-      <div class="theme-card pro ${prev ? "previewing" : ""}" data-pro-theme="${id}">
-        ${unlocked ? `<span class="pro-badge">PRO</span>` : `<span class="t-lock">🔒</span>`}
+      <div class="theme-card pro" data-pro-theme="${id}">
+        ${unlocked ? `<span class="pro-badge">PRO</span>` : `<span class="t-lock">${ICO.lock}</span>`}
         <div class="t-grad" style="background:${grad}"></div>
         <div class="t-name">${esc(t.label)}</div>
       </div>`;
@@ -307,61 +302,26 @@ function renderProThemes() {
 function onProThemeClick(id) {
   if (isPro(settings)) {
     // PRO: applica e salva (la sanitizzazione ammette il tema con la firma)
-    exitProPreview();
     settings.theme = id;
     save();
     return;
   }
-  // non-PRO: solo anteprima in memoria (mai persistita); un secondo click chiude
-  if (proPreviewThemeId === id) { exitProPreview(); return; }
-  proPreviewThemeId = id;
-  el("proPreviewName").textContent = PRO_THEMES[id].label;
-  el("proPreviewBar").hidden = false;
-  applyCurrentTheme();
-  updateThemeSelection();
-}
-
-function exitProPreview() {
-  if (!proPreviewThemeId) return;
-  proPreviewThemeId = null;
-  el("proPreviewBar").hidden = true;
-  applyCurrentTheme();
-  updateThemeSelection();
-}
-
-function bindProPreviewBar() {
-  if (previewBarBound) return;
-  previewBarBound = true;
-  el("proPreviewClose").addEventListener("click", exitProPreview);
-  el("proPreviewUnlock").addEventListener("click", () => {
-    // porta l'utente alla card di pagamento PRO (sezione Focus) e la evidenzia
-    switchSection("focus");
-    const card = el("proCard");
-    if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.classList.add("pro-pulse");
-      setTimeout(() => card.classList.remove("pro-pulse"), 1600);
-    }
-  });
+  // non-PRO: la preview si apre nella dashboard (nuova scheda) dove il tema è
+  // visibile in azione; non viene mai persistito.
+  chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") + "?preview=" + encodeURIComponent(id) });
 }
 
 /* ---------------- temi custom ------------- */
 let customEditingId = null; // id del tema in modifica; null = nuovo tema
 
 // Evidenzia il tema selezionato (entrambe le griglie) e apre l'editor quando è
-// selezionato un tema custom. Durante un'anteprima PRO la selezione normale è
-// oscurata: evidenzia solo la card in anteprima. Chiamato da save().
+// selezionato un tema custom. Chiamato da save().
 function updateThemeSelection() {
   document.querySelectorAll("#themeGrid .theme-card, #proThemeGrid .theme-card").forEach(card => {
-    const isProCard = !!card.dataset.proTheme;
-    const id = isProCard ? card.dataset.proTheme : card.dataset.theme;
-    let active;
-    if (proPreviewThemeId) active = isProCard && id === proPreviewThemeId;
-    else active = id === settings.theme;
-    card.classList.toggle("selected", !!active);
-    if (isProCard) card.classList.toggle("previewing", !!active && !!proPreviewThemeId);
+    const id = card.dataset.proTheme || card.dataset.theme;
+    card.classList.toggle("selected", id === settings.theme);
   });
-  const ct = proPreviewThemeId ? null : findCustomTheme(settings);
+  const ct = findCustomTheme(settings);
   if (ct) openCustomEditor(ct);
   else closeCustomEditor();
 }
@@ -371,12 +331,17 @@ function openCustomEditor(ct) {
   if (!ct) {
     // nuovo tema: parte dai colori del tema correntemente applicato
     const t = themeColors(settings);
-    ct = { name: "", bg: cssToRgb(t.bg), fg: cssToRgb(t.fg), accent: cssToRgb(t.accent) };
+    ct = { name: "", bg: cssToRgb(t.bg), fg: cssToRgb(t.fg), accent: cssToRgb(t.accent), bgImage: "" };
   }
   el("ctName").value = ct.name || "";
   setColorInputs("bg", ct.bg);
   setColorInputs("fg", ct.fg);
   setColorInputs("accent", ct.accent);
+  el("ctBgImage").value = ct.bgImage || "";
+  // l'immagine di sfondo del tema custom è PRO: per i free il campo resta bloccato
+  const pro = isPro(settings);
+  el("ctBgImage").disabled = !pro;
+  el("ctBgImageLock").hidden = pro;
   el("ctDelete").hidden = customEditingId === null;
   el("customEditor").hidden = false;
 }
@@ -398,7 +363,9 @@ function saveCustomTheme() {
     name: el("ctName").value.trim().slice(0, 24) || "Custom",
     bg: hexToRgb(document.querySelector('.ct-picker[data-key="bg"]').value),
     fg: hexToRgb(document.querySelector('.ct-picker[data-key="fg"]').value),
-    accent: hexToRgb(document.querySelector('.ct-picker[data-key="accent"]').value)
+    accent: hexToRgb(document.querySelector('.ct-picker[data-key="accent"]').value),
+    // PRO: URL dell'immagine di sfondo associata al tema (per i free resta vuoto)
+    bgImage: isPro(settings) ? (el("ctBgImage").value || "").trim() : ""
   };
   if (customEditingId) {
     const i = settings.customThemes.findIndex(c => c.id === customEditingId);
@@ -473,6 +440,12 @@ function renderAdvanced() {
   const r = el("borderRadius");
   r.value = settings.borderRadius ?? 8;
   el("borderRadiusVal").textContent = r.value + "px";
+
+  // immagine di sfondo (URL): funzione PRO — per i free il campo è disabilitato
+  // (e il valore non viene mai conservato: la sanitizzazione del background lo toglie)
+  const pro = isPro(settings);
+  el("bgImage").disabled = !pro;
+  el("bgImageLock").hidden = pro;
 
   if (advancedBound) return;
   advancedBound = true;
@@ -605,11 +578,142 @@ function renderBgMotion() {
    STATISTICHE
    ============================================================ */
 let stats = null;
+let statsOffset = 0;      // giorni indietro rispetto a oggi nella vista statistiche
+let statsNavBound = false;
+
+// Etichetta del giorno in esame: "Oggi" / "Ieri" / data formattata.
+function statsDayLabel() {
+  if (statsOffset === 0) return t("day_today");
+  if (statsOffset === 1) return t("day_yesterday");
+  return fmtDayLabel(dayKey(addDays(new Date(), -statsOffset)));
+}
+
+// Confronto settimanale: ultime 4 finestre di 7 giorni, con lo stesso dettaglio
+// della vista giornaliera (tempo per sito, blocchi/sblocchi). Le "fasce orarie"
+// della giornata non vengono tracciate dal modello dati (solo totali per giorno),
+// quindi il confronto copre il tempo per sito e i contatori per settimana.
+function renderWeekCmp() {
+  const body = el("weekCmpBody");
+  const distSet = new Set((settings.sites || []).map(s => s.domain));
+  const weeks = [];
+  for (let w = 0; w < 4; w++) {
+    const end = addDays(new Date(), -w * 7);
+    const start = addDays(end, -6);
+    const perSite = {};
+    const perDay = []; // 7 giorni della settimana: distraenti vs altri (come il grafico principale)
+    let blocked = 0, unlocks = 0;
+    for (let d = 0; d < 7; d++) {
+      const day = addDays(start, d);
+      const k = dayKey(day);
+      const { distracting, other } = splitByCategory(stats.byDay[k] || {}, settings);
+      perDay.push({ key: k, day, dist: totalSeconds(distracting), other: totalSeconds(other) });
+      for (const dom in (stats.byDay[k] || {})) perSite[dom] = (perSite[dom] || 0) + stats.byDay[k][dom];
+      blocked += stats.blocked[k] || 0;
+      unlocks += stats.unlocks[k] || 0;
+    }
+    const dist = perDay.reduce((a, p) => a + p.dist, 0);
+    const other = perDay.reduce((a, p) => a + p.other, 0);
+    const top = Object.entries(perSite).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    weeks.push({ start, end, dist, other, blocked, unlocks, top, perDay });
+  }
+
+  // grafico riassuntivo: le 4 settimane a confronto (barre accatastate distraenti/altri)
+  const maxTotal = Math.max(1, ...weeks.map(w => w.dist + w.other));
+  const pctOf = (v) => v <= 0 ? 0 : Math.max(3, (v / maxTotal) * 100);
+
+  // mini grafico per settimana: gli stessi 7 giorni della card "ultimi 7 giorni"
+  const miniChart = (wk) => {
+    const wkMax = Math.max(1, ...wk.perDay.map(p => p.dist + p.other));
+    const pct = (v) => v <= 0 ? 0 : Math.max(2, (v / wkMax) * 100);
+    return wk.perDay.map(p => {
+      const totalSecs = p.dist + p.other;
+      const bars = totalSecs > 0
+        ? `<div class="bar-stack">
+            ${p.other > 0 ? `<div class="bar other" style="height:${pct(p.other)}%"></div>` : ""}
+            ${p.dist > 0 ? `<div class="bar" style="height:${pct(p.dist)}%"></div>` : ""}
+          </div>`
+        : `<div class="bar-stack"></div>`;
+      return `<div class="bar-col" title="${esc(fmtDayLabel(p.key))} — ${esc(fmtDuration(totalSecs))}">
+        ${bars}
+        <span class="bar-label">${esc(p.day.toLocaleDateString(localeTag(), { weekday: "short" }))}</span>
+      </div>`;
+    }).join("");
+  };
+
+  body.innerHTML = `
+    <div class="week-cmp-summary">
+      <div class="week-cmp-summary-label">${esc(t("week_cmp_summary"))}</div>
+      <div class="legend">
+        <span class="lg"><span class="sw dist"></span>${esc(t("legend_distracting"))}</span>
+        <span class="lg"><span class="sw other"></span>${esc(t("legend_other"))}</span>
+      </div>
+      <div class="week-cmp-chart">
+        ${weeks.map(wk => `
+          <div class="bar-col" title="${esc(fmtShortDate(dayKey(wk.start)))} — ${esc(fmtDuration(wk.dist + wk.other))}">
+            <span class="bar-val">${esc(fmtDuration(wk.dist + wk.other))}</span>
+            <div class="bar-stack">
+              ${wk.other > 0 ? `<div class="bar other" style="height:${pctOf(wk.other)}%"></div>` : ""}
+              ${wk.dist > 0 ? `<div class="bar" style="height:${pctOf(wk.dist)}%"></div>` : ""}
+            </div>
+            <span class="bar-label">${esc(fmtShortDate(dayKey(wk.start)))}</span>
+          </div>`).join("")}
+      </div>
+    </div>
+    ${weeks.map(wk => {
+      const totalSecs = wk.dist + wk.other;
+      const topHtml = wk.top.length
+        ? wk.top.map(([dom, secs]) => {
+            const isDist = distSet.has(dom);
+            return `
+        <div class="top-row">
+          <span class="t-name ${isDist ? "dist" : ""}" ${isDist ? `title="${esc(t("on_distracting_sites"))}"` : ""}>${isDist ? `<span class="dot"></span>` : ""}${esc(dom)}</span>
+          <span class="t-track"><span class="t-fill" style="width:${totalSecs ? Math.round((secs / totalSecs) * 100) : 0}%"></span></span>
+          <span class="t-val">${Math.round(totalSecs ? (secs / totalSecs) * 100 : 0)}% · ${fmtDuration(secs)}</span>
+        </div>`;
+          }).join("")
+        : `<p class="hint">${esc(t("stats_no_data_today"))}</p>`;
+      return `
+        <div class="week-cmp-block">
+          <div class="week-cmp-head">
+            <span class="week-cmp-label">${esc(t("week_cmp_week", { date: fmtShortDate(dayKey(wk.start)) }))}</span>
+            <span class="week-cmp-totals">${t("stats_breakdown", { dist: fmtDuration(wk.dist), other: fmtDuration(wk.other) })} · ${t("stats_today_counts", { blocked: wk.blocked, unlocks: wk.unlocks })}</span>
+          </div>
+          <div class="week-cmp-mini">${miniChart(wk)}</div>
+          ${topHtml}
+        </div>`;
+    }).join("")}
+  `;
+}
+
+function openWeekCmp() {
+  if (el("weekDialog").open) return;
+  renderWeekCmp();
+  el("weekDialog").showModal();
+}
 
 async function renderStats() {
   stats = await getStats();
-  const today = new Date();
+  // la vista si sposta nel tempo con le frecce ‹ › (offset in giorni da oggi)
+  const today = addDays(new Date(), -statsOffset);
   const distSet = new Set((settings.sites || []).map(s => s.domain));
+  el("dayLabel").textContent = statsDayLabel();
+  el("dayNext").disabled = statsOffset === 0;
+  if (!statsNavBound) {
+    statsNavBound = true;
+    el("dayPrev").addEventListener("click", () => { statsOffset = Math.min(69, statsOffset + 1); renderStats(); });
+    el("dayNext").addEventListener("click", () => { statsOffset = Math.max(0, statsOffset - 1); renderStats(); });
+    el("weekCmpOpen").addEventListener("click", openWeekCmp);
+    // la card "Browsing Time" è cliccabile: apre il confronto settimanale
+    el("statsWeekCard").addEventListener("click", (e) => {
+      if (e.target.closest("#weekCmpOpen")) return; // il bottone gestisce già il click
+      openWeekCmp();
+    });
+    el("weekCmpClose").addEventListener("click", () => el("weekDialog").close());
+    // click fuori dal dialog (sul backdrop) → chiusura, come una finestra di sistema
+    el("weekDialog").addEventListener("click", (e) => {
+      if (e.target === el("weekDialog")) el("weekDialog").close();
+    });
+  }
 
   // grafico ultimi 7 giorni: barra dei siti distraenti (accento) + altri siti (muted)
   const days = [];
@@ -743,8 +847,8 @@ function renderCategories() {
     const name = esc(t(reg.labelKey));
     const doms = categoryDomains(settings, reg.id);
     const chips =
-      (inCt ? `<span class="chip ct-chip" data-until="${conf.ctUntil}">🔒 ${esc(ctRemainingLabel(conf.ctUntil))}</span>` : "") +
-      (conf.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(conf.schedule))}">🕒</span>` : "");
+      (inCt ? `<span class="chip ct-chip" data-until="${conf.ctUntil}">${ICO.lock} ${esc(ctRemainingLabel(conf.ctUntil))}</span>` : "") +
+      (conf.schedule ? `<span class="chip sched-chip" title="${esc(scheduleLabel(conf.schedule))}">${ICO.clock}</span>` : "");
     const list = ui.open ? `
       <div class="cat-domain-list">
         <div class="cat-domain-chips">
@@ -760,7 +864,7 @@ function renderCategories() {
             <button type="button" class="primary cat-dom-add" data-i18n="cat_add">${esc(t("cat_add"))}</button>
             <button type="button" class="cat-edit-done" data-i18n="cat_done">${esc(t("cat_done"))}</button>`
           : (inCt || locked)
-            ? `<button type="button" class="cat-pro-note" data-edit-gate>🔒 PRO · ${esc(t("cat_edit"))}</button>`
+            ? `<button type="button" class="cat-pro-note" data-edit-gate>${ICO.lock} PRO · ${esc(t("cat_edit"))}</button>`
             : `<button type="button" class="cat-edit-toggle" data-edit-start>✎ ${esc(t("cat_edit"))}</button>`}
         </div>
         <p class="cat-msg ${ui.ok ? "ok" : ui.msg ? "err" : ""}">${esc(ui.msg || "")}</p>
@@ -904,8 +1008,15 @@ function renderPro() {
     el("schedSave").addEventListener("click", onSchedSave);
     el("schedTarget").addEventListener("change", renderSchedEditor);
     el("schedList").addEventListener("click", onSchedDel);
-    el("proUnlock").addEventListener("click", onProUnlock);
-    el("proLogin").addEventListener("click", onProLogin);
+    // campo orario: selettori ora/minuti (opzioni fisse) che scrivono la bozza
+    const hOpts = Array.from({ length: 24 }, (_, i) => `<option value="${i}">${String(i).padStart(2, "0")}</option>`).join("");
+    const mOpts = Array.from({ length: 60 }, (_, i) => `<option value="${i}">${String(i).padStart(2, "0")}</option>`).join("");
+    for (const id of ["schedStartH", "schedEndH"]) el(id).innerHTML = hOpts;
+    for (const id of ["schedStartM", "schedEndM"]) el(id).innerHTML = mOpts;
+    el("schedStartH").addEventListener("change", e => { if (schedDraft) schedDraft.start = Number(e.target.value) * 60 + (schedDraft.start % 60); });
+    el("schedStartM").addEventListener("change", e => { if (schedDraft) schedDraft.start = Math.floor(schedDraft.start / 60) * 60 + Number(e.target.value); });
+    el("schedEndH").addEventListener("change", e => { if (schedDraft) schedDraft.end = Number(e.target.value) * 60 + (schedDraft.end % 60); });
+    el("schedEndM").addEventListener("change", e => { if (schedDraft) schedDraft.end = Math.floor(schedDraft.end / 60) * 60 + Number(e.target.value); });
   }
   if (unlocked) {
     fillTargetSelect(el("ctTarget"));
@@ -916,8 +1027,30 @@ function renderPro() {
   }
   renderProThemes();  // aggiorna i lucchetti delle card tema PRO allo stato attuale
   renderShortcuts();  // e il blocco/abilitazione dei collegamenti rapidi
+  renderMembership(); // stato account e upgrade (sezione Membership)
+  renderAdvanced();   // sblocca/blocca l'immagine di sfondo (URL) al cambio firma
   // la card "Sfondo dei temi PRO" ha senso solo con un tema PRO applicabile
   el("bgMotionCard").hidden = !unlocked;
+}
+
+/* Toggle di sviluppo PRO (Impostazioni → Info): sblocca le funzioni PRO in
+   locale senza verifica di pagamento. SOLO per le build di sviluppo: va rimosso
+   prima della pubblicazione (il background lo rispetta in verifyProLive). */
+let proDevBound = false;
+function renderProDev() {
+  const tgl = el("proDevToggle");
+  if (!tgl) return;
+  tgl.checked = !!settings._devPro;
+  if (proDevBound) return;
+  proDevBound = true;
+  tgl.addEventListener("change", async (e) => {
+    settings._devPro = e.target.checked;
+    settings[_PRO_SIG] = e.target.checked ? _PRO_OK : null;
+    await sendMessage({ type: "saveSettings", settings });
+    settings = await getSettings();
+    renderPro();
+    renderProDev();
+  });
 }
 
 /* ============================================================
@@ -928,6 +1061,25 @@ function renderShortcuts() {
   const unlocked = isPro(settings);
   el("shortcutsLocked").hidden = unlocked;
   el("shortcutsBody").hidden = !unlocked;
+  if (!shortcutsBound) {
+    shortcutsBound = true;
+    el("shortcutAdd").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = el("shortcutName").value.trim();
+      const url = el("shortcutUrl").value.trim();
+      if (!name || !/^https?:\/\//i.test(url)) return;
+      settings.shortcuts = [...(settings.shortcuts || []), { id: Date.now() + Math.random(), preset: null, name, url }];
+      el("shortcutName").value = "";
+      el("shortcutUrl").value = "";
+      renderShortcuts();
+      save();
+    });
+    el("shortcutsUnlock").addEventListener("click", () => {
+      // l'upsell è consolidato nella sezione Membership: porta l'utente lì
+      switchSection("membership");
+      onProUnlock("mMsg");
+    });
+  }
   if (!unlocked) return;
 
   const list = settings.shortcuts || [];
@@ -963,31 +1115,6 @@ function renderShortcuts() {
       renderShortcuts();
       save();
     });
-  });
-
-  if (shortcutsBound) return;
-  shortcutsBound = true;
-  el("shortcutAdd").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = el("shortcutName").value.trim();
-    const url = el("shortcutUrl").value.trim();
-    if (!name || !/^https?:\/\//i.test(url)) return;
-    settings.shortcuts = [...(settings.shortcuts || []), { id: Date.now() + Math.random(), preset: null, name, url }];
-    el("shortcutName").value = "";
-    el("shortcutUrl").value = "";
-    renderShortcuts();
-    save();
-  });
-  el("shortcutsUnlock").addEventListener("click", () => {
-    // porta l'utente alla card di pagamento PRO (sezione Focus) e la evidenzia
-    switchSection("focus");
-    const card = el("proCard");
-    if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
-      card.classList.add("pro-pulse");
-      setTimeout(() => card.classList.remove("pro-pulse"), 1600);
-    }
-    onProUnlock();
   });
 }
 
@@ -1027,8 +1154,8 @@ function renderCtActive() {
   }
   el("ctActive").innerHTML = items.length
     ? items.map(it =>
-      `<div class="pro-item"><span class="pro-label">🔒 ${esc(it.label)}</span>` +
-      `<span class="chip ct-chip" data-until="${it.until}">🔒 ${esc(ctRemainingLabel(it.until))}</span></div>`).join("")
+      `<div class="pro-item"><span class="pro-label">${ICO.lock} ${esc(it.label)}</span>` +
+      `<span class="chip ct-chip" data-until="${it.until}">${ICO.lock} ${esc(ctRemainingLabel(it.until))}</span></div>`).join("")
     : `<div class="empty">${esc(t("ct_empty"))}</div>`;
 }
 
@@ -1090,10 +1217,6 @@ function weekdayNames() {
 function minToHHMM(m) {
   return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 }
-function hhmmToMin(v) {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || ""));
-  return m ? (+m[1]) * 60 + (+m[2]) : NaN;
-}
 function scheduleLabel(sched) {
   if (!sched) return "";
   const wd = weekdayNames();
@@ -1102,19 +1225,43 @@ function scheduleLabel(sched) {
   return dLabel + " " + minToHHMM(sched.start) + "–" + minToHHMM(sched.end);
 }
 
+// Bozza NON persistita dell'editor fasce orarie: i giorni e gli orari scelti
+// dall'utente sopravvivono ai ri-render della pagina (es. scadenza di un blocco
+// ferreo o cambio di firma PRO) finché non vengono salvati o si cambia
+// destinazione. schedDraft.target è la chiave "kind:id" a cui si riferisce.
+let schedDraft = null;
+
 function renderSchedEditor() {
   const wrap = el("schedDays");
   const wd = weekdayNames();
   wrap.innerHTML = wd.map((name, i) =>
     `<button type="button" class="day-chip" data-d="${i + 1}">${esc(name)}</button>`).join("");
-  wrap.querySelectorAll(".day-chip").forEach(ch =>
-    ch.addEventListener("click", () => ch.classList.toggle("on")));
-  const target = findTarget(el("schedTarget").value);
-  const sched = target ? target.sched : null;
-  wrap.querySelectorAll(".day-chip").forEach(ch =>
-    ch.classList.toggle("on", !!(sched && sched.days.includes(Number(ch.dataset.d)))));
-  el("schedStart").value = sched ? minToHHMM(sched.start) : "09:00";
-  el("schedEnd").value = sched ? minToHHMM(sched.end) : "18:00";
+  const targetKey = el("schedTarget").value;
+  const target = findTarget(targetKey);
+  const saved = target ? target.sched : null;
+  // la bozza resta quella in corso finché non si salva o si cambia destinazione
+  if (!schedDraft || schedDraft.target !== targetKey) {
+    schedDraft = {
+      target: targetKey,
+      days: saved ? [...saved.days] : [],
+      start: saved ? saved.start : 9 * 60,
+      end: saved ? saved.end : 18 * 60
+    };
+  }
+  wrap.querySelectorAll(".day-chip").forEach(ch => {
+    const d = Number(ch.dataset.d);
+    ch.classList.toggle("on", schedDraft.days.includes(d));
+    ch.addEventListener("click", () => {
+      schedDraft.days = schedDraft.days.includes(d)
+        ? schedDraft.days.filter(x => x !== d)
+        : [...schedDraft.days, d];
+      ch.classList.toggle("on");
+    });
+  });
+  el("schedStartH").value = String(Math.floor(schedDraft.start / 60));
+  el("schedStartM").value = String(schedDraft.start % 60);
+  el("schedEndH").value = String(Math.floor(schedDraft.end / 60));
+  el("schedEndM").value = String(schedDraft.end % 60);
 }
 
 async function onSchedSave() {
@@ -1122,14 +1269,15 @@ async function onSchedSave() {
   el("schedMsg").textContent = "";
   if (!sel) return;
   const days = [...document.querySelectorAll("#schedDays .day-chip.on")].map(ch => Number(ch.dataset.d));
-  const start = hhmmToMin(el("schedStart").value);
-  const end = hhmmToMin(el("schedEnd").value);
-  if (!days.length || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+  const start = Number(el("schedStartH").value) * 60 + Number(el("schedStartM").value);
+  const end = Number(el("schedEndH").value) * 60 + Number(el("schedEndM").value);
+  if (!days.length || end <= start) {
     el("schedMsg").textContent = t("sched_invalid");
     return;
   }
   const [kind, id] = splitTarget(sel);
   const resp = await sendMessage({ type: "proSchedule", kind, id, schedule: { days, start, end } });
+  if (resp && resp.ok) schedDraft = null; // salvato: la prossima render riparte dallo stato persistito
   await applyProResponse(resp, "schedMsg");
 }
 
@@ -1142,7 +1290,7 @@ function renderSchedList() {
   }
   el("schedList").innerHTML = items.length
     ? items.map(it =>
-      `<div class="pro-item"><span class="pro-label">🕒 ${esc(it.label)}</span>` +
+      `<div class="pro-item"><span class="pro-label">${ICO.clock} ${esc(it.label)}</span>` +
       `<span class="hint">${esc(scheduleLabel(it.sched))}</span>` +
       `<button type="button" class="pro-del" data-kind="${it.kind}" data-id="${it.id}" title="${esc(t("sched_remove"))}">✕</button></div>`).join("")
     : `<div class="empty">${esc(t("sched_empty"))}</div>`;
@@ -1155,26 +1303,22 @@ async function onSchedDel(e) {
   await applyProResponse(resp, "schedMsg");
 }
 
-/* ---------------- toggle PRO di sviluppo (sezione Info) ---------------- */
-let devBound = false;
-async function renderDev() {
-  if (!el("proTestToggle")) return;
-  try {
-    const d = await chrome.storage.local.get("_devPro");
-    el("proTestToggle").checked = d._devPro === true;
-  } catch { /* ignora */ }
-  if (devBound) return;
-  devBound = true;
-  el("proTestToggle").addEventListener("change", async (e) => {
-    const on = e.target.checked;
-    await chrome.storage.local.set({ _devPro: on });
-    await sendMessage({ type: "proTest", on });
-    settings = await getSettings();
-    renderPro();
-  });
+/* ---------------- Membership: stato account + upgrade (sezione dedicata) ---------------- */
+let membershipBound = false;
+function renderMembership() {
+  const unlocked = isPro(settings);
+  el("planName").textContent = unlocked ? t("membership_state_lifetime") : t("membership_state_free");
+  el("planDesc").textContent = unlocked ? t("membership_pro_desc") : t("membership_free_desc");
+  el("membershipLocked").hidden = unlocked;
+  el("membershipActive").hidden = !unlocked;
+  if (membershipBound) return;
+  membershipBound = true;
+  el("mUnlock").addEventListener("click", () => onProUnlock("mMsg"));
+  el("mLogin").addEventListener("click", () => onProLogin("mMsg"));
+  el("proGoMembership").addEventListener("click", () => switchSection("membership"));
 }
 
-/* ---------------- sblocco PRO via ExtensionPay (sezione 7) ---------------- */
+/* ---------------- sblocco PRO via ExtensionPay ---------------- */
 let extpayUI = null;
 let proThanksTimer = null;
 function uiExtPay() {
@@ -1190,33 +1334,33 @@ function proThanks(text) {
   proThanksTimer = setTimeout(() => { th.hidden = true; }, 8000);
 }
 
-async function onProUnlock() {
-  el("proMsg").textContent = "";
+async function onProUnlock(msgId = "proMsg") {
+  el(msgId).textContent = "";
   const ep = uiExtPay();
   if (!ep) {
-    el("proMsg").textContent = t("pro_not_configured"); // build di sviluppo: serve il toggle in Info
+    el(msgId).textContent = t("pro_not_configured"); // build senza EXT_PAY_ID: PRO bloccato
     return;
   }
   try {
     await ep.openPaymentPage();
     pollPaidStatus();
   } catch {
-    el("proMsg").textContent = t("pro_pay_error");
+    el(msgId).textContent = t("pro_pay_error");
   }
 }
 
-async function onProLogin() {
-  el("proMsg").textContent = "";
+async function onProLogin(msgId = "proMsg") {
+  el(msgId).textContent = "";
   const ep = uiExtPay();
   if (!ep) {
-    el("proMsg").textContent = t("pro_not_configured");
+    el(msgId).textContent = t("pro_not_configured");
     return;
   }
   try {
     await ep.openLoginPage(); // chi ha già pagato può riattivare su questo browser
     pollPaidStatus();
   } catch {
-    el("proMsg").textContent = t("pro_pay_error");
+    el(msgId).textContent = t("pro_pay_error");
   }
 }
 
@@ -1254,18 +1398,21 @@ function ctRemainingLabel(until) {
 setInterval(() => {
   if (!settings) return;
   const now = Date.now();
-  let expired = false;
+  let changed = false;
   for (const o of [...(settings.sites || []), ...(settings.categories || [])]) {
-    if ((o.ctUntil || 0) > 0 && o.ctUntil <= now) expired = true;
+    if ((o.ctUntil || 0) > 0 && o.ctUntil <= now) { o.ctUntil = 0; changed = true; }
   }
   document.querySelectorAll(".ct-chip").forEach(ch => {
     const u = Number(ch.dataset.until || 0);
-    if (u > now) ch.textContent = "🔒 " + ctRemainingLabel(u);
+    if (u > now) ch.innerHTML = ICO.lock + " " + ctRemainingLabel(u);
   });
-  if (expired) {
+  if (changed) {
+    // pulizia una tantum dei blocchi scaduti: senza, ogni tick ri-renderizzerebbe
+    // le sezioni PRO all'infinito (azzerando la selezione dell'editor fasce orarie)
     renderSites();
     renderCategories();
     renderPro();
+    save();
   }
 }, 1000);
 

@@ -11,10 +11,10 @@
 const CATEGORIES = [
   { id: "social",   labelKey: "cat_social",   domains: ["facebook.com", "instagram.com", "x.com", "twitter.com", "tiktok.com", "snapchat.com", "pinterest.com", "t.me", "web.whatsapp.com", "discord.com", "reddit.com"] },
   { id: "video",    labelKey: "cat_video",    domains: ["youtube.com", "netflix.com", "primevideo.com", "disneyplus.com", "dailymotion.com", "vimeo.com"] },
-  { id: "news",     labelKey: "cat_news",     domains: ["repubblica.it", "corriere.it", "ansa.it", "bbc.com", "cnn.com", "nytimes.com", "theguardian.com", "wired.it"] },
+  { id: "news",     labelKey: "cat_news",     domains: ["bbc.com", "cnn.com", "nytimes.com", "theguardian.com", "reuters.com", "wired.com"] },
   { id: "adulti",   labelKey: "cat_adulti",   domains: ["pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com", "youporn.com", "onlyfans.com"] },
   { id: "gaming",   labelKey: "cat_gaming",   domains: ["twitch.tv", "steamcommunity.com", "epicgames.com", "roblox.com", "chess.com", "lichess.org"] },
-  { id: "shopping", labelKey: "cat_shopping", domains: ["amazon.com", "ebay.com", "zalando.it", "subito.it", "etsy.com", "aliexpress.com", "wish.com"] }
+  { id: "shopping", labelKey: "cat_shopping", domains: ["amazon.com", "ebay.com", "zalando.com", "etsy.com", "aliexpress.com", "wish.com"] }
 ];
 
 /* ============================================================
@@ -284,6 +284,8 @@ function findCustomTheme(settings) {
 }
 
 // Temi custom: card/border/muted derivati per interpolazione tra sfondo e testo.
+// `bgImage` (PRO) è un'immagine di sfondo associata al tema: ha la precedenza
+// sull'immagine globale di Aspetto → Avanzate.
 function customThemeColors(ct) {
   const bg = ct.bg || { r: 43, g: 43, b: 46 };
   const fg = ct.fg || { r: 242, g: 242, b: 240 };
@@ -295,7 +297,8 @@ function customThemeColors(ct) {
     card: cssRgb(mixColors(bg, fg, 0.07)),
     muted: cssRgb(mixColors(bg, fg, 0.45)),
     border: cssRgb(mixColors(bg, fg, 0.22)),
-    light: cssLuminance(cssRgb(bg)) > 0.55
+    light: cssLuminance(cssRgb(bg)) > 0.55,
+    bgImage: ct.bgImage || ""
   };
 }
 
@@ -379,8 +382,10 @@ function applyTheme(root, settings, allowProTheme) {
 
   // immagine di sfondo: l'URL vive dentro url("..."), quindi doppi apici e
   // backslash vengono escapati (e i caratteri di controllo rimossi) per evitare
-  // CSS injection; assente/vuoto → nessuna immagine.
-  const bgImg = settings && typeof settings.bgImage === "string" ? settings.bgImage.trim() : "";
+  // CSS injection; assente/vuoto → nessuna immagine. L'immagine del tema
+  // custom (PRO) ha la precedenza su quella globale di Aspetto → Avanzate.
+  const themeImg = typeof c.bgImage === "string" ? c.bgImage.trim() : "";
+  const bgImg = themeImg || (settings && typeof settings.bgImage === "string" ? settings.bgImage.trim() : "");
   if (bgImg) {
     const safe = bgImg.replace(/[\\"]/g, "\\$&").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
     st.setProperty("--bg-img", `url("${safe}")`);

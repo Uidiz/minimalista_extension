@@ -396,5 +396,82 @@ html.theme-grad #status {
   backdrop-filter: blur(10px);
 }
 
+/* ---------- navigazione storico statistiche (giorno) ---------- */
+.day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0 10px;
+}
+.day-nav .day-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-width: 84px;
+  text-align: center;
+}
+.day-arrow {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.day-arrow:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+.day-arrow:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------- preferiti: hint dei siti nascosti dal Focus ---------- */
+.fav-hidden-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 2px);
+}
+
+/* ---------- banner di anteprima tema PRO (dalla dashboard ?preview=) ---------- */
+.preview-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border: 1px solid color-mix(in srgb, #b57bff 55%, transparent);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.preview-banner svg { color: #b57bff; flex-shrink: 0; }
+.preview-banner strong { color: var(--accent); font-weight: 600; }
+.preview-banner button {
+  margin-left: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.preview-banner button:hover { color: var(--fg); border-color: var(--accent); }
+
 /* ---------- footer ---------- */
 footer { text-align: center; margin-top: 8px; font-size: 0.85rem; }

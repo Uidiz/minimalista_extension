@@ -165,7 +165,48 @@ main h2 { margin-bottom: 8px; }
 .pro-dur-row, .pro-time-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pro-dur-row button, .pro-time-row button { margin-left: auto; }
 .pro-days { display: flex; flex-wrap: wrap; gap: 6px; }
-.pro-tool input[type="time"] { padding: 6px 8px; }
+
+/* campo orario delle fasce: due "pill" tematizzate (ora : minuti) al posto dei
+   nativi input[type=time], che non seguivano i colori del tema */
+.sched-tag { color: var(--muted); font-size: 0.8rem; }
+.time-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius, 8px);
+  padding: 2px 6px;
+  transition: border-color 0.15s ease;
+}
+.time-field:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.time-field:focus-within {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+.time-field select {
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  padding: 6px 4px 6px 2px;
+  font-size: 1.02rem;
+  font-weight: 500;
+  width: 42px;
+  text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  border-radius: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  /* caret discreto: chiarisce che il campo è un selettore */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path d='M1 1l3 3 3-3' fill='none' stroke='%239a9aa2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+}
+.time-field select:hover { color: var(--accent); }
+.time-field select:focus { outline: none; }
+.time-colon { color: var(--muted); font-weight: 600; font-size: 1rem; user-select: none; }
 .pro-tool-sec {
   border-top: 1px dashed var(--border);
   padding-top: 12px;
@@ -504,7 +545,8 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 }
 
 #proCard,
-#shortcutsCard {
+#shortcutsCard,
+#advancedCard {
   position: relative;
   border: 2px solid transparent;
   background:
@@ -520,11 +562,14 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #proCard, #shortcutsCard, .theme-card.pro { animation: none; }
+  #proCard, #shortcutsCard, #advancedCard, .theme-card.pro { animation: none; }
   .theme-card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
   body:not(.no-hover) .theme-card:hover { transform: none; }
 }
 .pro-head { display: flex; align-items: center; gap: 12px; margin-bottom: 2px; }
+/* il margin-bottom globale di h2 spostava il badge PRO rispetto al titolo: si
+   azzera qui così il tag resta perfettamente centrato con la scritta */
+.pro-head h2 { margin: 0; }
 .pro-badge {
   font-size: 0.62rem;
   font-weight: 700;
@@ -536,6 +581,8 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
   border-radius: 999px;
 }
 .pro-tagline { color: var(--muted); font-size: 0.85rem; margin: 6px 0 14px; }
+/* respiro tra la descrizione e il pulsante "Gestisci la tua Membership" */
+#proLocked .btn-pro { margin-top: 14px; }
 .pro-features { list-style: none; display: flex; flex-direction: column; gap: 9px; margin: 14px 0 18px; }
 .pro-features li {
   display: flex;
@@ -570,17 +617,41 @@ code { background: var(--bg); border: 1px solid var(--border); border-radius: 4p
   border: 1px solid rgba(181,123,255,0.25);
 }
 .btn-pro {
+  position: relative;
+  overflow: hidden;
   border: none;
   font-weight: 600;
+  /* colore fisso: la scritta resta sempre leggibile su ogni tema (il hover
+     globale dei bottoni var(--accent) viene ripristinato qui sotto) */
   color: #140a24;
   background: linear-gradient(135deg, #b57bff, #6fe3c1);
   padding: 10px 18px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.92rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
-.btn-pro:hover { filter: brightness(1.12); }
-.btn-pro:active { transform: translateY(1px); }
+.btn-pro:hover {
+  color: #140a24; /* override di button:hover (accento del tema) */
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow: 0 8px 18px -8px rgba(181, 123, 255, 0.6);
+}
+.btn-pro:active { transform: translateY(1px); box-shadow: none; }
+/* riflesso che attraversa il bottone al passaggio del mouse */
+.btn-pro::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.45s ease;
+  pointer-events: none;
+}
+.btn-pro:hover::after { left: 130%; }
 .btn-ghost-pro {
   background: none;
   border: 1px solid var(--border);
@@ -722,3 +793,238 @@ button.chip.shortcut-add:hover { color: var(--accent); border-color: var(--accen
 .shortcut-add input:first-child { flex: 1; min-width: 0; }
 .shortcut-add input:nth-child(2) { flex: 1.6; min-width: 0; }
 #shortcutsMsg { min-height: 1em; margin: 6px 0 0; }
+
+/* ============================================================
+   Membership: stato account + upgrade (sezione dedicata)
+   ============================================================ */
+/* la voce di menu "Membership" resta pulita (niente sottolineato né corona):
+   il richiamo premium vive nel riquadro del piano della sezione Membership */
+
+/* piano attuale: pannello neutro, separato dal riquadro PRO a gradiente */
+.plan-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 4px);
+}
+.plan-info { flex: 1; min-width: 0; }
+.plan-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.plan-ico {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* corona neutra (piano attuale): diversa dalla corona PRO dorata qui sotto */
+  color: var(--muted);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(181, 123, 255, 0.22), rgba(245, 199, 106, 0.14));
+  border: 1px solid rgba(181, 123, 255, 0.35);
+}
+.plan-ico svg { display: block; }
+.plan-name { font-size: 1.2rem; font-weight: 600; color: var(--fg); line-height: 1.2; margin-top: 1px; }
+.plan-desc { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+/* riquadro PRO a gradiente: riservato alle cose PRO (offerta o conferma) */
+#membershipCard .plan-box {
+  margin-top: 14px;
+  padding: 18px 20px;
+  border: 2px solid transparent;
+  border-radius: calc(var(--border-radius, 8px) + 8px);
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    conic-gradient(from var(--pro-angle, 0deg),
+      rgba(181, 123, 255, 0.95), rgba(111, 227, 193, 0.9), rgba(79, 195, 247, 0.95),
+      rgba(245, 199, 106, 0.85), rgba(181, 123, 255, 0.95)) border-box;
+  animation: proCardSpin 5s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  #membershipCard .plan-box { animation: none; }
+  .btn-pro { transition: none; }
+  .btn-pro::after { display: none; }
+}
+.pro-box-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.pro-box-head .crown { display: inline-flex; color: #f5c76a; }
+.pro-box-head .crown svg { display: block; }
+.pro-box-title { flex: 1; font-weight: 600; font-size: 0.95rem; color: var(--fg); }
+#membershipLocked .pro-features { margin: 4px 0 16px; }
+
+/* ============================================================
+   Statistiche: navigazione per giorno + confronto settimanale
+   ============================================================ */
+.day-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.day-label { margin: 0; }
+.day-arrow {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.day-arrow:hover:not(:disabled) { color: var(--fg); border-color: var(--accent); }
+.day-arrow:disabled { opacity: 0.35; cursor: default; }
+#statsWeekCard { cursor: pointer; }
+#statsWeekCard .row { margin-bottom: 6px; }
+#statsWeekCard .row h2 { margin: 0; }
+#statsWeekCard .ghost { margin-left: auto; flex-shrink: 0; }
+
+dialog.week-dialog {
+  margin: auto;
+  background: var(--card);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 6px);
+  padding: 22px 24px;
+  width: min(640px, calc(100vw - 40px));
+  max-height: 80vh;
+}
+dialog.week-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog.week-dialog h3 { margin-bottom: 6px; }
+.week-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.week-dialog-head h3 { margin-bottom: 0; }
+.dlg-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.dlg-close:hover { color: var(--fg); border-color: var(--accent); }
+#weekCmpBody {
+  margin-top: 12px;
+  max-height: 52vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+}
+.week-cmp-block {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--border-radius, 8px) + 2px);
+  padding: 12px 14px;
+  background: var(--bg);
+}
+.week-cmp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.week-cmp-label { font-weight: 600; color: var(--fg); font-size: 0.92rem; }
+.week-cmp-totals { color: var(--muted); font-size: 0.8rem; }
+.week-cmp-totals strong { color: var(--fg); }
+.week-dialog .top-row { padding: 4px 0; }
+.week-dialog .t-name { width: 150px; }
+.week-dialog .t-val { width: 120px; }
+
+/* grafici del confronto settimanale: riassunto delle 4 settimane + mini grafico per settimana
+   (stesse barre accatastate della card "ultimi 7 giorni", in scala ridotta) */
+.week-cmp-summary {
+  margin: 10px 0 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--border);
+}
+.week-cmp-summary-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 2px;
+}
+.week-cmp-summary .legend { margin: 2px 0 4px; }
+.week-cmp-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 118px;
+}
+.week-cmp-chart .bar-col { height: 100%; }
+.week-cmp-chart .bar-stack { max-width: 34px; }
+.week-cmp-chart .bar-val {
+  font-size: 0.68rem;
+  color: var(--fg);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.week-cmp-mini {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 62px;
+  margin: 10px 0 6px;
+  padding-top: 6px;
+}
+.week-cmp-mini .bar-stack { max-width: 24px; gap: 1px; }
+.week-cmp-mini .bar { border-radius: 3px 3px 1px 1px; min-height: 2px; }
+.week-cmp-mini .bar-label { font-size: 0.58rem; }
+
+/* ============================================================
+   Icone SVG nelle UI PRO (al posto delle emoji) + note di blocco
+   ============================================================ */
+.chip svg,
+.pro-label svg,
+.cat-pro-note svg,
+.lock-note svg { display: inline-block; vertical-align: -2px; }
+.theme-card.pro .t-lock { display: inline-flex; align-items: center; justify-content: center; }
+.theme-card.pro .t-lock svg { width: 14px; height: 14px; }
+.lock-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  margin: 2px 0 10px;
+}
+.ct-bgimg-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 2px;
+  flex-wrap: wrap;
+}
+.ct-bgimg-row label { color: var(--muted); font-size: 0.85rem; min-width: 88px; }
+.ct-bgimg-row input { flex: 1; min-width: 200px; }
+.ct-bgimg-row .pro-badge { flex-shrink: 0; }
+.ct-bgimg-row input:disabled { opacity: 0.5; cursor: not-allowed; }
